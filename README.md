@@ -231,7 +231,7 @@ There is no need to pass this method into the template. Because it's in the cont
 			<a href="$Link">
 				<span class="btn btn-default"> Read More</span>
 			</a>
-			$Photo.CroppedImage(220,148)
+			$Photo.Fit(220,148)
 		</div>
 		<div class="tag"><i class="fa fa-file-text"></i></div>
 		<div class="info-blog">
