@@ -70,6 +70,10 @@ class Region extends DataObject
     private static $has_one = [
         'Photo' => Image::class,
     ];
+    
+    private static $owns = [
+        'Photo',
+    ];
 
     public function getCMSFields()
     {
@@ -86,6 +90,7 @@ class Region extends DataObject
     }
 }
 ```
+As described in a previous tutorial, the `$owns` array is used to ensure that when regions are saved, their related images are pubilshed as well. Files and images are, by default, draft until explicitly published. This ensures they'll be implicitly published with the page that uses them.
 
 You might have noticed that our `getCMSFields()` function looks a bit different. That's because we're not going to be using the typical page editing interface for this object, so we're not going to have the tabs that come with Page objects. We could very easily create one, but since this data type is so simple, we'll just leave it as a simple field list, and add all the form fields to the constructor.
 
@@ -177,6 +182,45 @@ Let's take a look at the argument signature for `GridField`:
 *   **$this->Regions()**: This is the most substantial component of your GridField. It populates the grid with data. In this case, we're using the magic method created by our `$has_many` relationship to fill the grid with all the records that are currently associated with the page.
 *   **GridFieldConfig_RecordEditor::create()**: This is a bit more complex. It creates a object that contains a number of `GridFieldComponent` objects, which provide various UI tools to the grid, such as pagination, an "add new" button, delete/edit buttons, etc. These `GridFieldConfig` objects can be configured with any variety of components you like, but SilverStripe ships with a few common configurations that are often used. `GridFieldConfig_RecordEditor` is a great one, because it provides all the basic UI you'd expect to have for managing data.
 
+### Adding versioning
+
+Right now, any changes we make to regions will go to the live site immediately, since they have no published/draft state. Let's start by adding versioning to those records.
+
+*mysite/code/Region.php*
+```php
+//...
+use SilverStripe\Versioned\Versioned;
+
+class Region extends DataObject
+{
+    //...
+    private static $extensions = [
+        Versioned::class,
+    ];    
+    //...  
+```
+
+First, we apply the [DataExtension](https://docs.silverstripe.org/en/4/developer_guides/extending/extensions/) `Versioned`. We'll talk more about extensions in a future tutorial, but for now, just understand that this extension mixes functionality into the class to make it support versioning.
+
+Run a `dev/build?flush` and we should see some new tables created.
+
+Lastly, we need to declare ownership between `RegionsPage` and `Region` so that changes to publication cascades from parent to child, and vice-versa.
+
+*mysite/code/RegionsPage.php*
+```php
+//...
+class RegionsPage extends Page
+{
+    //...
+    private static $owns = [
+        'Regions'
+    ];    
+    //...  
+```
+
+
+Notice that we don't need to use the fully-qualified class name, `Region::class`, in the `$owns` declaration. That's because we're referring to the relationship, not the class. The relationship is declared as `Regions` in the `has_many` array. The entries in `$owns` could just as easily be method names, if you wanted to declare ownership in a custom getter.
+
 Let's go back into the CMS and edit our "Regions" page. See that we have a tab now that contains a grid. Give it a try and add some test records.
 
 #### Configuring the GridField
@@ -254,6 +298,19 @@ class Region extends DataObject
 
 This type of syntax becomes especially useful when formatting dates, or getting the title of a related `$has_one` rather than just showing its numeric ID.
 
+#### Adding versioning to GridField
+At the moment, GridField isn't offering us anything in the way of publication. All we have are "Save" and "Delete" buttons. To get the full array of publishing actions ("Save", "Publish", "Archive", etc.), we'll need to explicitly state the `Region` object should use versioned GridField extensions. To enable that, set `versioned_gridfield_extensions` to `true`.
+
+```php
+//...
+class Region extends DataObject
+{
+    //...
+    private static $versioned_gridfield_extensions = true;
+    //...
+}
+```
+
 ### Working with relational data on the template
 
 Now that our relational data is all in place, it's time to display it on the template. This should be pretty straight forward. Let's start with `RegionsPage.ss`
@@ -281,3 +338,4 @@ _themes/one-ring/templates/Layout/RegionsPage.ss, line 9_
 </div>
 ```
 Notice that we're skipping over the links. We'll address that in a future lesson.
+
