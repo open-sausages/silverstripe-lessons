@@ -67,7 +67,9 @@ class ArticleCategory extends DataObject {
 }
 ```
 
-Notice once again that we have the reciprocal `$has_one` back to the `ArticleHolder`.
+Notice once again that we have the reciprocal `$has_one` back to the `ArticleHolder`. 
+
+Also take note that we won't use versioning for this DataObject. This is a deliberate decision based on the knowledge that there are no views where all of the categories will be listed. We know that the only way a category will appear on the frontend is when it is associated with an article. So based on that, we don't need to worry about the published state of categories.
 
 Run `dev/build` again and see that we get a new table. Edit the "Travel Guides" page in the CMS and add a few sample categories.
 
@@ -90,7 +92,7 @@ class ArticlePage extends Page {
 }
 ```
 
-Run `dev/build` and see that we get a new table, `ArticlePage_Categories`.
+Run `dev/build` and see that we get a new table, `SilverStripe_Lessons_ArticlePage_Categories`.
 
 #### Reciprocating the $many_many
 
