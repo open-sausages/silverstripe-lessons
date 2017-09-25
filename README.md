@@ -234,7 +234,7 @@ We define a method for one of the most used extension points in the framework, `
 
 To activate our extension, we need to apply it to the `SilverStripe\SiteConfig\SiteConfig` class. This is done through the Config layer.
 
-_mysite/_config/config.yml_
+_mysite/_config/mysite.yml_
 ```yaml
     SilverStripe\SiteConfig\SiteConfig:
       extensions:
