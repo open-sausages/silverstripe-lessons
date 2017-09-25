@@ -40,6 +40,17 @@ class Property extends DataObject
 	];
 ```
 
+We should also add some fields to the CMS so these can be edited.
+
+```php
+public function getCMSFields()
+{
+  //...
+  DateField::create('AvailableStart', 'Date available (start)'),
+  DateField::create('AvailableEnd', 'Date available (end)'),
+  //...    
+```
+
 Run `dev/build` and see that we get some new fields.
 
 We'll spare you the trouble of populating those values for 100 records, so now is a good time to execute the `__assets/set_property_dates.sql` file in this lesson, so that we have some data to search on. It populates the `AvailableStart` and `AvailableEnd` columns with a random date between now and a year from now. The end date is a random value of 1-14 days after the start date.
@@ -53,6 +64,19 @@ UPDATE SilverStripe_Lessons_Property SET AvailableStart = FROM_UNIXTIME(
 UPDATE SilverStripe_Lessons_Property SET AvailableEnd = FROM_UNIXTIME(
         UNIX_TIMESTAMP(AvailableStart) + FLOOR(1 + (RAND() * 1209600))
 );
+
+UPDATE SilverStripe_Lessons_Property_Live SET AvailableStart = (
+  SELECT AvailableStart
+    FROM SilverStripe_Lessons_Property
+    WHERE
+      SilverStripe_Lessons_Property.ID = SilverStripe_Lessons_Property_Live.ID
+);
+UPDATE SilverStripe_Lessons_Property_Live SET AvailableEnd = (
+  SELECT AvailableEnd
+    FROM SilverStripe_Lessons_Property
+    WHERE
+      SilverStripe_Lessons_Property.ID = SilverStripe_Lessons_Property_Live.ID
+);
 ```
 
 Our keyword search will need to search a property description. We'll add that field, as well.
@@ -60,7 +84,8 @@ Our keyword search will need to search a property description. We'll add that fi
 *mysite/code/Property.php*
 ```php
 //...
-class Property extends DataObject {
+class Property extends DataObject
+{
 
 	private static $db = [
      //...
@@ -342,7 +367,7 @@ if ($bedrooms = $request->getVar('Bedrooms')) {
 }
 ```
 
-A few more of those, and here we have our final code:
+A few more of those, and here we have all of our filters:
 
 *mysite/code/PropertySearchPageController.php*
 ```php
@@ -465,7 +490,7 @@ Now that we have our `$Results` list being passed to the template, we'll loop th
 		<a href="$Link">
 			<span class="btn btn-default"><i class="fa fa-file-o"></i> Details</span>
 		</a>
-		$PrimaryPhoto.Fit(760,670)
+		$PrimaryPhoto.Fill(760,670)
 	</div>
 	<div class="price">
 		<span>$PricePerNight.Nice</span><p>per night<p>
