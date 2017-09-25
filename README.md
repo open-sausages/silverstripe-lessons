@@ -53,6 +53,8 @@ use SilverStripe\Forms\CurrencyField;
 use SilverStripe\Forms\CheckboxField;
 use SilverStripe\AssetAdmin\Forms\UploadField;
 use SilverStripe\ORM\ArrayLib;
+use SilverStripe\Assets\Image;
+use SilverStripe\Forms\TabSet;
 
 class Property extends DataObject
 {
@@ -67,8 +69,8 @@ class Property extends DataObject
 
 
 	private static $has_one = [
-		'Region' => 'Region',
-		'PrimaryPhoto' => 'Image'
+		'Region' => Region::class,
+		'PrimaryPhoto' => Image::class,
 	];
 
 
@@ -130,7 +132,7 @@ class PropertyAdmin extends ModelAdmin
 	private static $url_segment = 'properties';
 
 	private static $managed_models = [
-		'Property'
+		Property::class,
 	];
 }
 ```
@@ -152,12 +154,12 @@ We'll start with what we've seen before. `$summary_fields` gives us control over
 *mysite/code/Property.php*
 ```php
   //...
-	private static $summary_fields = array (
+	private static $summary_fields = [
 		'Title' => 'Title',
 		'Region.Title' => 'Region',
 		'PricePerNight.Nice' => 'Price',
 		'FeaturedOnHomepage.Nice' => 'Featured?'
-	);
+	];
 	//...
 ```
 
@@ -216,9 +218,18 @@ Searching by region title is nice, but it doesn't make a whole lot of sense for 
 In order to do that, we'll have to write some executable code, which can't placed in a static variable assignment, so let's change `private static $searchable_fields` to `public function searchableFields()`, and we'll return an array.
 
 ```php
-namespae SilverStripe\Lessons;
+namespace SilverStripe\Lessons;
 
 use SilverStripe\ORM\DataObject;
+use SilverStripe\Forms\FieldList;
+use SilverStripe\Forms\TextField;
+use SilverStripe\Forms\DropdownField;
+use SilverStripe\Forms\CurrencyField;
+use SilverStripe\Forms\CheckboxField;
+use SilverStripe\AssetAdmin\Forms\UploadField;
+use SilverStripe\ORM\ArrayLib;
+use SilverStripe\Assets\Image;
+use SilverStripe\Forms\TabSet;
 
 class Property extends DataObject
 {
@@ -230,7 +241,7 @@ class Property extends DataObject
 			'Title' => [
 				'filter' => 'PartialMatchFilter',
 				'title' => 'Title',
-				'field' => 'TextField'
+				'field' => TextField::class,
 			],
 			'RegionID' => [
 				'filter' => 'ExactMatchFilter',
@@ -261,9 +272,40 @@ When we define `searchableFields()`, we need to be much more explicit about how 
 
 Give the search form a try now. It feels a little better, right?
 
+### Adding versioning
+
+Properties are perhaps the most important elements on this entire website, so we'll want to ensure they have a draft state. We'll also add an `$owns` property for the primary photo, so it gets published as well.
+
+```php
+```php
+//...
+use SilverStripe\Versioned\Versioned;
+
+class Property extends DataObject
+{
+  //...
+  private static $owns = [
+      'PrimaryPhoto',
+  ];
+
+  private static $extensions = [
+      Versioned::class,
+  ];
+
+  private static $versioned_gridfield_extensions = true;
+  
+	public function searchableFields()
+	{
+    //...
+```
+
+Run a `dev/build` to get the new tables.
+
 ### Importing data
 
 If you haven't been doing so all along, it's probably a good time to import a database from the `__assets/database.sql` file in the completed version of this lesson. That file will add many sample properties to the database for you, which will really help when testing features like search and sort.
+
+Don't forget to copy over the `assets/` folder, too. The property photos are in there.
 
 ## Adding properties to the template
 
@@ -301,7 +343,7 @@ Now let's render the output to the template.
 			<h3>$Title</h3>
 			<span class="location">$Region.Title</span>
 		</a>
-		$PrimaryPhoto.CroppedImage(220,194)
+		$PrimaryPhoto.Fill(220,194)
 	</div>
 	<div class="price">
 		<span>$PricePerNight.Nice</span><p>per night<p>
