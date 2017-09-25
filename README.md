@@ -465,7 +465,7 @@ Now that we have our `$Results` list being passed to the template, we'll loop th
 		<a href="$Link">
 			<span class="btn btn-default"><i class="fa fa-file-o"></i> Details</span>
 		</a>
-		$PrimaryPhoto.Fit(760,670)
+		$PrimaryPhoto.Fill(760,670)
 	</div>
 	<div class="price">
 		<span>$PricePerNight.Nice</span><p>per night<p>
