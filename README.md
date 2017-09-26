@@ -119,7 +119,6 @@ Let's use some more properties of the paginated list to create a summary of the 
 *themes/one-ring/templates/SilverStripe/Lessons/Layout/PropertySearchPage.ss*
 ```html
 <% if $Results %>
-	<div class="col-md-12">
 	<h3>Showing $Results.PageLength results ($Results.getTotalItems total)</h3>					
 	<% loop $Results %>
 ```
@@ -174,8 +173,9 @@ Another parameter we might want to customise is the request parameter that is us
 		$paginatedProperties = PaginatedList::create(
 			$properties,
 			$request
-		)->setPageLength(15)
-		 ->setPaginationGetVar('s');
+		)
+		    ->setPageLength(15)
+		    ->setPaginationGetVar('s');
 
 		//...
 	}
