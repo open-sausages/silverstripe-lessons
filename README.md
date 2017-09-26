@@ -2,7 +2,11 @@ In the previous tutorial, we activated most of the sidebar filters for our Trave
 
 ### Adding date filter links to the template
 
+<<<<<<< HEAD
 Looking at the template, we first have to generate a list of all the distinct month/year combinations for all the articles. Let's start by working backwards, and we want the end result to be on the template.
+=======
+Having a rich supply of data to work with is paramount to getting value out of this lesson, so once you get the code changes in place, it's a good idea to import the `database.sql` file that is included in the completed version of this lesson. It will provide you with a hundred or so randomly composed `ArticlePage` records that we'll be filtering.
+>>>>>>> Lesson 19 complete
 
 *themes/one-ring/templates/SilverStripe/Lessons/Layout/ArticleHolder.ss*
 ```html
@@ -89,7 +93,11 @@ To work outside the ORM, we can use the `SilverStripe\ORM\Queries\SQLSelect` cla
 
 The main advantage to this layer of abstraction is that it's platform agnostic, so that if someday you change database platforms, you don't need to update any syntax. All select queries end up in `SQLSelect` eventually. `SiteTree::get()` is just a higher level of abstraction that builds an `SQLSelect` object. To build a really custom query, we're just going further down the food chain, so to speak.
 
+<<<<<<< HEAD
 We get the name of the table for `ArticlePage` from the `DataObjectSchema` class. This class contains a lot of valuable information for introspecting the abstractions of the ORM. You can ask it for the table name for a given class, get the database column for a given field, get all the database fields for a given class, and much more. In this case, we get the table name from the schema. Table names are user-configurable, but by default it follows the simple pattern of replacing the backslashes in the fully-qualified class name to underscores. In this case, `SilverStripe_Lessons_ArticlePage` is returned by the `tableName` function.
+=======
+Notice that we're calling a non-existent method on `Region` called `$ArticlesLink`. This will return a URL to the Travel Guides section with the appropriate region filter applied. Don't worry about that just yet. We'll create it later in this lesson. It's just a placeholder for now.
+>>>>>>> Lesson 19 complete
 
 One major drawback of working outside the ORM is that we can no longer take versioning for granted. We have to be explicit about what table we want to select from. It is therefore imperative to check the current stage, and apply the necessary suffix to the table, e.g. *ArticlePage_Live*. Again, it's rare that you have to deal with stuff like this.
 
@@ -107,6 +115,7 @@ Now all we have to do is loop through that database result to create our final l
 
 *mysite/code/ArticleHolder.php*
 ```php
+<<<<<<< HEAD
 		if ($result) {
 			while($record = $result->nextRecord()) {
 				list($year, $monthName, $monthNumber) = explode('_', $record['DateString']);
@@ -122,6 +131,15 @@ Now all we have to do is loop through that database result to create our final l
 						])->count()
 				]));
 			}
+=======
+  //...
+	public function ArticlesLink()
+	{
+		$page = ArticleHolder::get()->first();
+
+		if($page) {
+			return $page->Link('region/'.$this->ID);
+>>>>>>> Lesson 19 complete
 		}
 ```
 
@@ -133,7 +151,12 @@ Here's the complete `ArchiveDates()` function:
 
 *mysite/code/ArticleHolder.php*
 ```php
+<<<<<<< HEAD
 	public function ArchiveDates()
+=======
+   //...
+	public function Link()
+>>>>>>> Lesson 19 complete
 	{
 		$list = ArrayList::create();
 		$stage = Versioned::get_stage();		
@@ -189,11 +212,28 @@ class ArticleHolderController extends PageController
 
 		if (!$year) return $this->httpError(404);
 
+<<<<<<< HEAD
 		$startDate = $month ? "{$year}-{$month}-01" : "{$year}-01-01";
 		
 		if (strtotime($startDate) === false) {
 			return $this->httpError(404, 'Invalid date');
 		} 
+=======
+*mysite/code/ArticleHolderController.php*
+```php
+//...
+use SilverStripe\ORM\PaginatedList;
+
+class ArticleHolderController extends PageController
+{
+  //...
+	public function PaginatedArticles ($num = 10)
+	{		
+		return PaginatedList::create(
+			$this->articleList,
+			$this->getRequest()
+		)->setPageLength($num);
+>>>>>>> Lesson 19 complete
 	}
 ```
 
