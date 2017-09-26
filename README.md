@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 * An overview of environments
 * Setting up logging on different environments
 * Dealing with email
@@ -145,38 +146,158 @@ At the centre of dealing with Ajax responses is the use of includes in your Layo
 	<% include SilverStripe/Lessons/PropertySearchResults %>				
 </div>	
 <!-- END MAIN CONTENT -->
+=======
+## What we'll cover
+* What are we working towards?
+* Updating the template: Working backwards
+* Updating the controller to use generic data
+
+## What are we working towards?
+
+Up until now, the data on our templates has been pretty one-sided. It's sourced from the database, and we render the fields from one or many returned records on the template. Often times, however, the template and the database are not so tightly coupled. There's actually no rule saying that all template data has to come from the database
+
+Ultimately what we're teaching in this lesson is the concept of *composable UI elements*. As you may know, composable components are a rapidly accelerating trend in application development as developers and designers seek to maintain a high level of agility and reusability.
+
+Being composable, these components are essentially "dumb" and only really know how to do one thing, which is render some UI based on the configuration that has been passed to them, which is what we'll call a *composition*.
+
+In the context of our project, we'll be lighting up the search filter toggle buttons in the sidebar of our property search page. The purpose of these buttons is to show the user what search filters have been applied, and to offer an option to remove them and refresh the search page.
+
+## Updating the template: Working backwards
+
+A lot of developers, including myself, find it easier to work backwards with problems like this, which means starting from the template and adding the backend afterward. Let's look at these filter buttons and try to abtract them into something we can use.
+
+As we can see, they're all statically contained in a `ul` tag at the moment.
+
+```html
+<ul class="chzn-choices">
+   <li class="search-choice"><span>New York</span><a href="#" class="search-choice-close"></a></li>
+   <li class="search-choice"><span>Residential</span><a href="#" class="search-choice-close"></a></li>
+   <li class="search-choice"><span>3 bedrooms</span><a href="#" class="search-choice-close"></a></li>
+   <li class="search-choice"><span>2 bathrooms</span><a href="#" class="search-choice-close"></a></li>
+   <li class="search-choice"><span>Min. $150</span><a href="#" class="search-choice-close"></a></li>
+   <li class="search-choice"><span>Min. $400</span><a href="#" class="search-choice-close"></a></li>
+</ul>
 ```
 
-Notice that the `Includes/` part of the path is implicit when calling `<% include %>`.
+### The wrong way to do it
 
-Reload the page with `?flush` to get the new template.
+One approach that may come to mind is using a long series of display logic to output all of the possible options, like so:
 
-Now, returning an Ajax response is trivial. Simply render the include.
+```html
+<ul class="chzn-choices">
+<% if $LocationFilter %>
+   <li class="search-choice"><span>$LocationFilter</span><a href="#" class="search-choice-close"></a></li>
+<% end_if %>
 
+<% if $BedroomFilter %>
+   <li class="search-choice"><span>$BedroomFilter bedrooms</span><a href="#" class="search-choice-close"></a></li>
+<% end_if %>
+
+<!-- etc... -->
+</ul>
+```
+
+This might look reasonable at first, it's going to lead to nothing but problems. There are a number of things wrong with this approach.
+
+* It pollutes your template with syntax, and a lot of repeated markup
+* It pollutes your controller with a lot of repetative property assignments and/or methods
+* It creates more parity between your controller and your template. If you ever want to add or remove a new search option, you have to remember to update the template.
+* We have to repurpose the *value* of the filter as its *label*, e.g. `$BedroomFilter bedrooms`, and at some point that's just not going to work. Search filters are often not human-readable, such as IDs.
+
+### A better approach
+
+If the sight of `li` tags nested in a `ul` is becoming almost synonymous with the `<% loop %>` control to you, that's a good sign. We're definitely going to need a loop here. This will keep the UI much cleaner, and it will give us more control over the output, as we'll have a chance to *compose* each member of the loop. Let's add that now, and make up the rest as we go.
+
+```html
+<ul class="chzn-choices">
+   <% loop $ActiveFilters %>
+     	<li class="search-choice"><span>New York</span><a href="#" class="search-choice-close"></a></li>
+   <% end_loop %>
+</ul>
+```
+
+Make sense so far? Again, we're working backwards, so the `$ActiveFilters` piece is merely semantic right now. 
+
+Let's now just go through brainstorm some property names for all the dynamic content.
+
+```html
+<ul class="chzn-choices">
+   <% loop $ActiveFilters %>
+   		<li class="search-choice"><span>$Label</span><a href="$RemoveLink" class="search-choice-close"></a></li>
+   <% end_loop %>
+</ul>
+```
+
+We've added the properties `$Label` and `$RemoveLink`, which we can assume are the only two distinguishing traits of each filter button.
+
+## Updating the controller
+
+Now that our template syntax is in place, we need to configure the controller to feed this data to the template. We could write a new method called `ActiveFilters()` (or `getActiveFilters()`) that inspects the request and returns something, but given that there's only one endpoint for our search page, I think it makes more sense at this point in the project to create the filter UI elements as they're being applied to the list.
+
+### Creating an arbitrary list
+
+In order to invoke the `<% loop %>` block, we of course will need some kind of iteratable list. So far, we've been using `SilverStripe\ORM\DataList`, which represents a list of records associated with a database query. Since our filter UI elements are not coming from the database, we'll need something more primitive. In this case, `SilverStripe\ORM\ArrayList` is an ideal choice.
+
+At the top of our `index()` action, let's instantiate that list.
+
+*mysite/code/PropertySearchPageController.php*
 ```php
 //...
+use SilverStripe\ORM\ArrayList;
+
+class PropertySearchPageController extends PageController
+{
+	public function index(HTTPRequest $request)
+	{
+		$properties = Property::get();
+		$filters = ArrayList::create();
+	
+		//...
+	}
+	//...
+>>>>>>> Begin lesson 18
+```
+Now, we just need to fill our list with data.
+
+### Remember ViewableData?
+To populate the list, we'll revisit our old friend `SilverStripe\View\ViewableData` from the previous tutorial. Just as a recap, `ViewableData` is a primitive object that is ready to be rendered on a template. One type of `ViewableData` is `DataObject`, which we've been using all along to render content from the database.
+
+You will rarely need to use the `ViewableData` class itself, but its immediate descendant, `SilverStripe\View\ArrayData` is very flexible and couldn't be simpler to implement. It's basically just a glorified array. All you have to do is instantiate it with an array of key/value pairs that will translate to `$Variable` template variables, and render their associated values.
+
+Let's add the filter for the `Keywords` filter.
+
+*mysite/code/PropertySearchPageController.php*
+```php
+//...
+use SilverStripe\View\ArrayData;
+use SilverStripe\Control\HTTP;
+
 class PropertySearchPageController extends PageController
 {
 
-
 	public function index(HTTPRequest $request)
 	{
-
+		
 		//...
 		
-		if($request->isAjax()) {
-			return $this->renderWith('SilverStripe/Lessons/Includes/PropertySearchResults');
+		if ($search = $request->getVar('Keywords')) {
+			$filters->push(ArrayData::create([
+				'Label' => "Keywords: '$search'",
+				'RemoveLink' => HTTP::setGetVar('Keywords', null)
+			]));
+
+			$properties = $properties->filter([
+				'Title:PartialMatch' => $search
+			]);
 		}
 		
 		//..
-	}
-}
+
 ```
 
-This time, we don't benefit from the implicit `Includes/` directory. Unlike the template syntax, we need to specify it when referring to it in controller code.
+Using the `push()` method on `ArrayList`, we add `ArrayData` objects to it. Each one has `Label` and `RemoveLink` properties, as required by the template. The `RemoveLink` property implements an obscure utility method from the `SilverStripe\Control\HTTP` helper class. All it does is take the current URI and set a given query parameter to a given value. In this case, we're setting it to `null` to effectively remove the filter.
 
-Let's try this out. It's not quite working right. We're getting a "no results" message when we paginate. That's because the `$Results` variable is not exposed to the template through `renderWith()`. It's just a local variable in our `index()` method. We have two choices here:
-
+<<<<<<< HEAD
 * Assign `$paginatedProperties` to a public property on the controller
 * Explicitly pass it to the template using `customise()`.
 >>>>>>> Lesson 17 complete
@@ -191,17 +312,31 @@ A simple solution to this problem is to simply force the "to" address to go to y
 Email:
   send_all_emails_to: 'me@example.com'
 =======
+=======
+The next filter is for the availability date range. It actually doesn't offer a whole lot of utility to the user to display this as a toggleable filter, especially since it's actually a composite filter of `ArrivalDate` and `Nights`, so let's skip this one.
+
+The next several are pretty straightforward. Let's add the filter UI elements for Bedrooms, Bathrooms, and Min/Max Price.
+
+*mysite/code/PropertySearchPageController.php*
+```php
+>>>>>>> Begin lesson 18
 	public function index(HTTPRequest $request)
 	{
-
-		//...
 		
-		if($request->isAjax()) {
-			return $this->customise([
-				'Results' => $paginatedResults
-			])->renderWith('SilverStripe/Lessons/Includes/PropertySearchResults');
+		//...
+
+		if ($bedrooms = $request->getVar('Bedrooms')) {
+			$filters->push(ArrayData::create([
+				'Label' => "$bedrooms bedrooms",
+				'RemoveLink' => HTTP::setGetVar('Bedrooms', null)
+			]));
+
+			$properties = $properties->filter([
+				'Bedrooms:GreaterThanOrEqual' => $bedrooms
+			]);
 		}
 
+<<<<<<< HEAD
 		return [
 			'Results' => $paginatedProperties
 		];
@@ -243,73 +378,49 @@ Perhaps in the test and production environments, we want to monitor transactiona
     Email:
       bcc_all_emails_to: 'me@example.com'
 =======
+=======
+		if ($bathrooms = $request->getVar('Bathrooms')) {
+			$filters->push(ArrayData::create([
+				'Label' => "$bathrooms bathrooms",
+				'RemoveLink' => HTTP::setGetVar('Bathrooms', null)
+			]));
 
-	public function index(HTTPRequest $request) {
-
-		//...
-		
-		$data = [
-			'Results' => $paginatedProperties
-		];
-
-		if($request->isAjax()) {
-			return $this->customise($data)
-						 ->renderWith('SilverStripe/Lessons/Includes/PropertySearchResults');
+			$properties = $properties->filter([
+				'Bathrooms:GreaterThanOrEqual' => $bathrooms
+			]);
 		}
 
-		return $data;
+		if ($minPrice = $request->getVar('MinPrice')) {
+			$filters->push(ArrayData::create([
+				'Label' => "Min. \$$minPrice",
+				'RemoveLink' => HTTP::setGetVar('MinPrice', null)
+			]));
+>>>>>>> Begin lesson 18
+
+			$properties = $properties->filter([
+				'PricePerNight:GreaterThanOrEqual' => $minPrice
+			]);
+		}
+
+		if ($maxPrice = $request->getVar('MaxPrice')) {
+			$filters->push(ArrayData::create([
+				'Label' => "Max. \$$maxPrice",
+				'RemoveLink' => HTTP::setGetVar('MaxPrice', null)
+			]));
+
+			$properties = $properties->filter([
+				'PricePerNight:LessThanOrEqual' => $maxPrice
+			]);
+		}
+
+		//...
 	}
-}
+
 ```
 
-Try it now. It's looking much better!
+### Passing the filters to the template
 
-## Adding some UX enhancements
-
-There are two major shortcomings of this user experience:
-* The scroll stays fixed to the bottom of the results, leaving the user with little indication that the content has been updated
-* The URL is not updated, so a page refresh after paginating will take the user back to the first page
-
-Let's clean up both of these things now, with some updates to our Javascript.
-
-*themes/one-ring/js/scripts.js*
-```js
-// Pagination
-if ($('.pagination').length) {
-    var paginate = function (url) {
-        $.ajax(url)
-            .done(function (response) {
-                $('.main').html(response);
-                $('html, body').animate({
-                    scrollTop: $('.main').offset().top
-                });
-                window.history.pushState(
-                    {url: url},
-                    document.title,
-                    url
-                );    
-            })
-            .fail(function (xhr) {
-                alert('Error: ' + xhr.responseText);
-            });
-
-    };
-    $('.main').on('click','.pagination a', function (e) {
-        e.preventDefault();
-        var url = $(this).attr('href');
-        paginate(url);
-    });
-    
-    window.onpopstate = function(e) {
-        if (e.state.url) {
-            paginate(e.state.url);
-        }
-        else {
-            e.preventDefault();
-        }
-    };        
-}
-
+<<<<<<< HEAD
 >>>>>>> Lesson 17 complete
 ```
 
@@ -318,3 +429,29 @@ This works okay, but it's kind of broad. If we have other developers on the proj
 ### MailCatcher
 
 A much more thorough solution is to use a thirdparty tool to capture outgoing emails from your dev environment. There are a few of these tools available, but the one I like, and recommend, is [MailCatcher](https://mailcatcher.me/). Follow the instructions on the home page to install the software, and with just a bit of configuration, you can pipe all email into a local inbox. To browse the inbox, simply visit localhost:1080. Now, you can monitor all outgoing emails, and know exactly who would receive them and what their contents would be in a production environment.
+=======
+Just like our custom variable `Results`, we'll pass the `ActiveFilters` list to the template through an array.
+
+*mysite/code/PropertySearchPageController.php*
+```php
+	public function index(HTTPRequest $request) {
+		
+		//...
+
+		$paginatedProperties = PaginatedList::create(
+			$properties,
+			$request
+		)->setPageLength(15)
+		 ->setPaginationGetVar('s');
+
+		$data = array (
+			'Results' => $paginatedProperties,
+			'ActiveFilters' => $filters			
+		);
+
+		//...
+	}
+```
+
+Reload the page, and you should have working filter buttons now!
+>>>>>>> Begin lesson 18
