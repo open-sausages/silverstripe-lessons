@@ -72,11 +72,15 @@ Make sense so far? Again, we're working backwards, so the `$ActiveFilters` piece
 Let's now just go through brainstorm some property names for all the dynamic content.
 
 ```html
-<ul class="chzn-choices">
-   <% loop $ActiveFilters %>
-   		<li class="search-choice"><span>$Label</span><a href="$RemoveLink" class="search-choice-close"></a></li>
-   <% end_loop %>
-</ul>
+<% if $ActiveFilters %>
+<div class="chzn-container-multi">
+  <ul class="chzn-choices">
+     <% loop $ActiveFilters %>
+        <li class="search-choice"><span>$Label</span><a href="$RemoveLink" class="search-choice-close"></a></li>
+     <% end_loop %>
+  </ul>
+</div>
+<% end_if %>
 ```
 
 We've added the properties `$Label` and `$RemoveLink`, which we can assume are the only two distinguishing traits of each filter button.
@@ -101,7 +105,7 @@ class PropertySearchPageController extends PageController
 	public function index(HTTPRequest $request)
 	{
 		$properties = Property::get();
-		$filters = ArrayList::create();
+		$activeFilters = ArrayList::create();
 	
 		//...
 	}
@@ -131,9 +135,9 @@ class PropertySearchPageController extends PageController
 		//...
 		
 		if ($search = $request->getVar('Keywords')) {
-			$filters->push(ArrayData::create([
+			$activeFilters->push(ArrayData::create([
 				'Label' => "Keywords: '$search'",
-				'RemoveLink' => HTTP::setGetVar('Keywords', null)
+				'RemoveLink' => HTTP::setGetVar('Keywords', null, null, '&'),
 			]));
 
 			$properties = $properties->filter([
@@ -149,7 +153,7 @@ Using the `push()` method on `ArrayList`, we add `ArrayData` objects to it. Each
 
 The next filter is for the availability date range. It actually doesn't offer a whole lot of utility to the user to display this as a toggleable filter, especially since it's actually a composite filter of `ArrivalDate` and `Nights`, so let's skip this one.
 
-The next several are pretty straightforward. Let's add the filter UI elements for Bedrooms, Bathrooms, and Min/Max Price.
+The next several, which are all part of our tidy loop, are pretty straightforward. We'll add another member to the `$filterKeys` list, which will be a `sprintf()` compatible template to generate the label for each filter.
 
 *mysite/code/PropertySearchPageController.php*
 ```php
@@ -158,49 +162,26 @@ The next several are pretty straightforward. Let's add the filter UI elements fo
 		
 		//...
 
-		if ($bedrooms = $request->getVar('Bedrooms')) {
-			$filters->push(ArrayData::create([
-				'Label' => "$bedrooms bedrooms",
-				'RemoveLink' => HTTP::setGetVar('Bedrooms', null)
-			]));
+    $filters = [
+        ['Bedrooms', 'Bedrooms', 'GreaterThanOrEqual', '%s bedrooms'],
+        ['Bathrooms', 'Bathrooms', 'GreaterThanOrEqual', '%s bathrooms'],
+        ['MinPrice', 'PricePerNight', 'GreaterThanOrEqual', 'Min. $%s'],
+        ['MaxPrice', 'PricePerNight', 'LessThanOrEqual', 'Max. $%s'],
+    ];
 
-			$properties = $properties->filter([
-				'Bedrooms:GreaterThanOrEqual' => $bedrooms
-			]);
-		}
+    foreach($filters as $filterKeys) {
+        list($getVar, $field, $filter, $labelTemplate) = $filterKeys;
+        if ($value = $request->getVar($getVar)) {
+            $activeFilters->push(ArrayData::create([
+                'Label' => sprintf($labelTemplate, $value),
+                'RemoveLink' => HTTP::setGetVar($getVar, null, null, '&'),
+            ]));
 
-		if ($bathrooms = $request->getVar('Bathrooms')) {
-			$filters->push(ArrayData::create([
-				'Label' => "$bathrooms bathrooms",
-				'RemoveLink' => HTTP::setGetVar('Bathrooms', null)
-			]));
-
-			$properties = $properties->filter([
-				'Bathrooms:GreaterThanOrEqual' => $bathrooms
-			]);
-		}
-
-		if ($minPrice = $request->getVar('MinPrice')) {
-			$filters->push(ArrayData::create([
-				'Label' => "Min. \$$minPrice",
-				'RemoveLink' => HTTP::setGetVar('MinPrice', null)
-			]));
-
-			$properties = $properties->filter([
-				'PricePerNight:GreaterThanOrEqual' => $minPrice
-			]);
-		}
-
-		if ($maxPrice = $request->getVar('MaxPrice')) {
-			$filters->push(ArrayData::create([
-				'Label' => "Max. \$$maxPrice",
-				'RemoveLink' => HTTP::setGetVar('MaxPrice', null)
-			]));
-
-			$properties = $properties->filter([
-				'PricePerNight:LessThanOrEqual' => $maxPrice
-			]);
-		}
+            $properties = $properties->filter([
+                "{$field}:{$filter}" => $value
+            ]);
+        }
+    }
 
 		//...
 	}
@@ -213,7 +194,8 @@ Just like our custom variable `Results`, we'll pass the `ActiveFilters` list to 
 
 *mysite/code/PropertySearchPageController.php*
 ```php
-	public function index(HTTPRequest $request) {
+	public function index(HTTPRequest $request)
+	{
 		
 		//...
 
@@ -225,7 +207,7 @@ Just like our custom variable `Results`, we'll pass the `ActiveFilters` list to 
 
 		$data = array (
 			'Results' => $paginatedProperties,
-			'ActiveFilters' => $filters			
+			'ActiveFilters' => $activeFilters			
 		);
 
 		//...
