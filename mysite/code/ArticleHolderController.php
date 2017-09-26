@@ -4,7 +4,10 @@ namespace SilverStripe\Lessons;
 
 use SilverStripe\ORM\PaginatedList;
 use SilverStripe\Control\HTTPRequest;
+<<<<<<< HEAD
 use SilverStripe\ORM\FieldType\DBField;
+=======
+>>>>>>> Lesson 19 complete
 use PageController;
 
 class ArticleHolderController extends PageController
@@ -64,6 +67,7 @@ class ArticleHolderController extends PageController
         ];
     }
 
+<<<<<<< HEAD
     public function date(HTTPRequest $r)
     {
         $year = $r->param('ID');
@@ -94,6 +98,8 @@ class ArticleHolderController extends PageController
         ];
     }
 
+=======
+>>>>>>> Lesson 19 complete
     public function PaginatedArticles ($num = 10)
     {
         return PaginatedList::create(
@@ -101,4 +107,8 @@ class ArticleHolderController extends PageController
             $this->getRequest()
         )->setPageLength($num);
     }
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> Lesson 19 complete

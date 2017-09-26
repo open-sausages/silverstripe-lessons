@@ -42,6 +42,7 @@ class ArticleHolder extends Page
         }
     }
 
+<<<<<<< HEAD
     public function ArchiveDates()
     {
         $list = ArrayList::create();
@@ -77,3 +78,6 @@ class ArticleHolder extends Page
         return $list;
     }
 }
+=======
+}
+>>>>>>> Lesson 19 complete

@@ -164,7 +164,7 @@ In this lesson we'll talk about filtering a list of items on a template. In a pr
 * Filtering through controller actions
 * Adding filter headers
 
-Having a rich supply of data to work with is paramount to getting value out of this lesson, so before getting started, be sure to import the database attached in this lesson. It will provide you with a hundred or so randomly composed `ArticlePage` records that we'll be filtering.
+Having a rich supply of data to work with is paramount to getting value out of this lesson, so once you get the code changes in place, it's a good idea to import the `database.sql` file that is included in the completed version of this lesson. It will provide you with a hundred or so randomly composed `ArticlePage` records that we'll be filtering.
 
 ## Setting up new relationships
 
@@ -251,7 +251,7 @@ We'll need to add these to the template. Replace the "tags" section with the lis
 
 Getting the number of articles associated with the region is a simple call to the `Articles` relation. Every list in SilverStripe (the `SS_List` interface) exposes a `count()` method.
 
-Notice that we're calling a non-existent method on `Region` called `$ArticlesLink`. This will return a URL to the Travel Guides section with the appopriate region filter applied. Don't worry about that just yet. We'll create it later in this lesson. It's just a placeholder for now.
+Notice that we're calling a non-existent method on `Region` called `$ArticlesLink`. This will return a URL to the Travel Guides section with the appropriate region filter applied. Don't worry about that just yet. We'll create it later in this lesson. It's just a placeholder for now.
 
 While we're in this section, we should light up the list of categories in the sidebar. This is actually a bit easier than the list of regions, because `ArticleHolder` already has a `has_many` for `Categories`.
 
@@ -328,7 +328,7 @@ Now that we know what our routes will look like, let's get back to the `Region` 
 *mysite/code/Region.php*
 ```php
   //...
-	public function ArticlesLink ()
+	public function ArticlesLink()
 	{
 		$page = ArticleHolder::get()->first();
 
@@ -360,7 +360,7 @@ Let's now add the `Link()` method to the categories.
 *mysite/code/ArticleCategory.php*
 ```php
    //...
-	public function Link ()
+	public function Link()
 	{
 		return $this->ArticleHolder()->Link(
 			'category/'.$this->ID
@@ -402,9 +402,14 @@ If you're wondering why we don't just use `Children()`, which effectively does t
 
 We're going to want the articles paginated, so let's create a method that applies a `PaginatedList` to the `$articleList` member variable. This will be our single point of access to the list of articles that we're building.
 
-*mysite/code/ArticleHolder.php*
+*mysite/code/ArticleHolderController.php*
 ```php
-	//...
+//...
+use SilverStripe\ORM\PaginatedList;
+
+class ArticleHolderController extends PageController
+{
+  //...
 	public function PaginatedArticles ($num = 10)
 	{		
 		return PaginatedList::create(
