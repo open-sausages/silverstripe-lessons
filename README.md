@@ -124,6 +124,7 @@ A better option for low-level errors is writing to a log file. Let's set that up
 
 Let's make sure that error log doesn't get checked into our repository by adding it to `.gitignore`.
 
+<<<<<<< HEAD
 *.gitignore*
 ```
 ...
@@ -132,17 +133,84 @@ errors.log
 ```
 
 ## Dealing with email
+=======
+So now that we have a good understanding of `ViewableData`, let's play around with some of its features. Right now, we're just returning a string to the template for our Ajax response. Let's instead return a partial template.
+
+At the centre of dealing with Ajax responses is the use of includes in your Layout template. Let's take everything in the `.main` div, and export it to an include called `PropertySearchResults`.
+
+*themes/one-ring/templates/SilverStripe/Lessons/Includes/PropertySearchResults.ss*
+```html
+<!-- BEGIN MAIN CONTENT -->
+<div class="main col-sm-8">
+	<% include SilverStripe/Lessons/PropertySearchResults %>				
+</div>	
+<!-- END MAIN CONTENT -->
+```
+
+Notice that the `Includes/` part of the path is implicit when calling `<% include %>`.
+
+Reload the page with `?flush` to get the new template.
+
+Now, returning an Ajax response is trivial. Simply render the include.
+
+```php
+//...
+class PropertySearchPageController extends PageController
+{
+
+
+	public function index(HTTPRequest $request)
+	{
+
+		//...
+		
+		if($request->isAjax()) {
+			return $this->renderWith('SilverStripe/Lessons/Includes/PropertySearchResults');
+		}
+		
+		//..
+	}
+}
+```
+
+This time, we don't benefit from the implicit `Includes/` directory. Unlike the template syntax, we need to specify it when referring to it in controller code.
+
+Let's try this out. It's not quite working right. We're getting a "no results" message when we paginate. That's because the `$Results` variable is not exposed to the template through `renderWith()`. It's just a local variable in our `index()` method. We have two choices here:
+
+* Assign `$paginatedProperties` to a public property on the controller
+* Explicitly pass it to the template using `customise()`.
+>>>>>>> Lesson 17 complete
 
 While we're on the topic of email, let's take some control over transactional emails in our environments. This can be a really annoying problem for a couple of reasons. For one, if we're testing with real data, we don't want transactional emails to be sent to real users from our development environment. Second, we want to be able to test whether those emails would be sent, and what their contents would be if we were in production.
 
 A simple solution to this problem is to simply force the "to" address to go to you in the dev environment. You can configure this in the config yaml.
 
+<<<<<<< HEAD
 *mysite/_config/config.yml*
 ```yaml
 Email:
   send_all_emails_to: 'me@example.com'
+=======
+	public function index(HTTPRequest $request)
+	{
+
+		//...
+		
+		if($request->isAjax()) {
+			return $this->customise([
+				'Results' => $paginatedResults
+			])->renderWith('SilverStripe/Lessons/Includes/PropertySearchResults');
+		}
+
+		return [
+			'Results' => $paginatedProperties
+		];
+	}
+}
+>>>>>>> Lesson 17 complete
 ```
 
+<<<<<<< HEAD
 Pretty straightforward, but we're forgetting something. We don't want this setting to apply to all environments. We need to ensure that this yaml is only loaded in the dev environment. We're not writing PHP, so we don't have the convenience of if/else blocks, but fortunately, the SilverStripe YAML parser affords us a basic API for conditional logic.
 
 *mysite/_config/email.yml*
@@ -174,6 +242,75 @@ Perhaps in the test and production environments, we want to monitor transactiona
     ---
     Email:
       bcc_all_emails_to: 'me@example.com'
+=======
+
+	public function index(HTTPRequest $request) {
+
+		//...
+		
+		$data = [
+			'Results' => $paginatedProperties
+		];
+
+		if($request->isAjax()) {
+			return $this->customise($data)
+						 ->renderWith('SilverStripe/Lessons/Includes/PropertySearchResults');
+		}
+
+		return $data;
+	}
+}
+```
+
+Try it now. It's looking much better!
+
+## Adding some UX enhancements
+
+There are two major shortcomings of this user experience:
+* The scroll stays fixed to the bottom of the results, leaving the user with little indication that the content has been updated
+* The URL is not updated, so a page refresh after paginating will take the user back to the first page
+
+Let's clean up both of these things now, with some updates to our Javascript.
+
+*themes/one-ring/js/scripts.js*
+```js
+// Pagination
+if ($('.pagination').length) {
+    var paginate = function (url) {
+        $.ajax(url)
+            .done(function (response) {
+                $('.main').html(response);
+                $('html, body').animate({
+                    scrollTop: $('.main').offset().top
+                });
+                window.history.pushState(
+                    {url: url},
+                    document.title,
+                    url
+                );    
+            })
+            .fail(function (xhr) {
+                alert('Error: ' + xhr.responseText);
+            });
+
+    };
+    $('.main').on('click','.pagination a', function (e) {
+        e.preventDefault();
+        var url = $(this).attr('href');
+        paginate(url);
+    });
+    
+    window.onpopstate = function(e) {
+        if (e.state.url) {
+            paginate(e.state.url);
+        }
+        else {
+            e.preventDefault();
+        }
+    };        
+}
+
+>>>>>>> Lesson 17 complete
 ```
 
 This works okay, but it's kind of broad. If we have other developers on the project, they're not going to get any emails, and we also can't accurately test from our dev environment what the "to" address would actually be in production or test.
