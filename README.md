@@ -92,7 +92,7 @@ Since email is a pretty aggressive form of error notification, we probably don't
 *mysite/_config/logging.yml*
 ```yml
     --- 
-    Name: live-logging
+    Name: lessons-live-logging
     Only:
       environment: live
     ---
@@ -109,7 +109,7 @@ A better option for low-level errors is writing to a log file. Let's set that up
 *mysite/_config/logging.yml*
 ```yml
     ---
-    Name: all-logging
+    Name: lessons-all-logging
     ---
     SilverStripe\Core\Injector\Injector:
       Psr\Log\LoggerInterface: 
@@ -122,6 +122,14 @@ A better option for low-level errors is writing to a log file. Let's set that up
           - "notice"
 ```
 
+Let's make sure that error log doesn't get checked into our repository by adding it to `.gitignore`.
+
+*.gitignore*
+```
+...
+# ignore error log
+errors.log
+```
 
 ## Dealing with email
 
