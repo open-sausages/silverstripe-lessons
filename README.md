@@ -150,10 +150,12 @@ At the centre of dealing with Ajax responses is the use of includes in your Layo
 ```html
 <!-- BEGIN MAIN CONTENT -->
 <div class="main col-sm-8">
-	<% include PropertySearchResults %>				
+	<% include SilverStripe/Lessons/PropertySearchResults %>				
 </div>	
 <!-- END MAIN CONTENT -->
 ```
+
+Notice that the `Includes/` part of the path is implicit when calling `<% include %>`.
 
 Reload the page with `?flush` to get the new template.
 
@@ -171,7 +173,7 @@ class PropertySearchPageController extends PageController
 		//...
 		
 		if($request->isAjax()) {
-			return $this->renderWith('PropertySearch');
+			return $this->renderWith('SilverStripe/Lessons/Includes/PropertySearchResults');
 		}
 		
 		//..
@@ -179,7 +181,9 @@ class PropertySearchPageController extends PageController
 }
 ```
 
-Let's try it out. It's not quite working right. We're getting a "no results" message when we paginate. That's because the `$Results` variable is not exposed to the template through `renderWith()`. It's just a local variable in our `index()` method. We have two choices here:
+This time, we don't benefit from the implicit `Includes/` directory. Unlike the template syntax, we need to specify it when referring to it in controller code.
+
+Let's try this out. It's not quite working right. We're getting a "no results" message when we paginate. That's because the `$Results` variable is not exposed to the template through `renderWith()`. It's just a local variable in our `index()` method. We have two choices here:
 
 * Assign `$paginatedProperties` to a public property on the controller
 * Explicitly pass it to the template using `customise()`.
@@ -199,7 +203,7 @@ class PropertySearchPageController extends PageController
 		if($request->isAjax()) {
 			return $this->customise([
 				'Results' => $paginatedResults
-			])->renderWith('PropertySearchResults');
+			])->renderWith('SilverStripe/Lessons/Includes/PropertySearchResults');
 		}
 
 		return [
@@ -226,7 +230,7 @@ class PropertySearchPageController extends PageController
 
 		if($request->isAjax()) {
 			return $this->customise($data)
-						 ->renderWith('PropertySearchResults');
+						 ->renderWith('SilverStripe/Lessons/Includes/PropertySearchResults');
 		}
 
 		return $data;
@@ -265,7 +269,7 @@ if ($('.pagination').length) {
                 alert('Error: ' + xhr.responseText);
             });
 
-    }
+    };
     $('.main').on('click','.pagination a', function (e) {
         e.preventDefault();
         var url = $(this).attr('href');
