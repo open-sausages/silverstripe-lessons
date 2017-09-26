@@ -11,7 +11,7 @@ In the last tutorial, we added pagination to our list of search results. Let's n
 
 Before we do anything, we'll need to add some JavaScript that will add this functionality. We'll do this in our catch-all JavaScript file, `scripts.js`.
 
-*themes/one-ring/js/scripts.js*
+*themes/one-ring/javascript/scripts.js*
 ```js
 // Pagination
 if ($('.pagination').length) {
@@ -150,10 +150,12 @@ At the centre of dealing with Ajax responses is the use of includes in your Layo
 ```html
 <!-- BEGIN MAIN CONTENT -->
 <div class="main col-sm-8">
-	<% include PropertySearchResults %>				
+	<% include SilverStripe/Lessons/PropertySearchResults %>				
 </div>	
 <!-- END MAIN CONTENT -->
 ```
+
+Notice that the `Includes/` part of the path is implicit when calling `<% include %>`.
 
 Reload the page with `?flush` to get the new template.
 
@@ -164,14 +166,13 @@ Now, returning an Ajax response is trivial. Simply render the include.
 class PropertySearchPageController extends PageController
 {
 
-
 	public function index(HTTPRequest $request)
 	{
 
 		//...
 		
 		if($request->isAjax()) {
-			return $this->renderWith('PropertySearch');
+			return $this->renderWith('SilverStripe/Lessons/Includes/PropertySearchResults');
 		}
 		
 		//..
@@ -179,7 +180,9 @@ class PropertySearchPageController extends PageController
 }
 ```
 
-Let's try it out. It's not quite working right. We're getting a "no results" message when we paginate. That's because the `$Results` variable is not exposed to the template through `renderWith()`. It's just a local variable in our `index()` method. We have two choices here:
+This time, we don't benefit from the implicit `Includes/` directory. Unlike the template syntax, we need to specify it when referring to it in controller code.
+
+Let's try this out. It's not quite working right. We're getting a "no results" message when we paginate. That's because the `$Results` variable is not exposed to the template through `renderWith()`. It's just a local variable in our `index()` method. We have two choices here:
 
 * Assign `$paginatedProperties` to a public property on the controller
 * Explicitly pass it to the template using `customise()`.
@@ -199,7 +202,7 @@ class PropertySearchPageController extends PageController
 		if($request->isAjax()) {
 			return $this->customise([
 				'Results' => $paginatedResults
-			])->renderWith('PropertySearchResults');
+			])->renderWith('SilverStripe/Lessons/Includes/PropertySearchResults');
 		}
 
 		return [
@@ -226,7 +229,7 @@ class PropertySearchPageController extends PageController
 
 		if($request->isAjax()) {
 			return $this->customise($data)
-						 ->renderWith('PropertySearchResults');
+						 ->renderWith('SilverStripe/Lessons/Includes/PropertySearchResults');
 		}
 
 		return $data;
@@ -244,7 +247,7 @@ There are two major shortcomings of this user experience:
 
 Let's clean up both of these things now, with some updates to our Javascript.
 
-*themes/one-ring/js/scripts.js*
+*themes/one-ring/javascript/scripts.js*
 ```js
 // Pagination
 if ($('.pagination').length) {
@@ -265,7 +268,7 @@ if ($('.pagination').length) {
                 alert('Error: ' + xhr.responseText);
             });
 
-    }
+    };
     $('.main').on('click','.pagination a', function (e) {
         e.preventDefault();
         var url = $(this).attr('href');
@@ -286,6 +289,41 @@ if ($('.pagination').length) {
 First, we'll add an `animate()` method that will handle the automatic scrolling. Then, we'll push some state to the browser history using `pushState`.
 
 Lastly, we make export the `.ajax()` call to a function, so that both the pagination links and the browser back button will be able to invoke it when we add an `onpopstate` event.
+
+### Reapplying plugins
+
+A lot of the UI plugins we're using are applied on document load, which means that when part of the DOM gets replaced, they won't be applied. Notice as you paginated through the results that the "sort by" dropdown degrades back to a standard HTML input. Let's ensure the fancy dropdown gets reapplied.
+
+We'll export the `chosen()` plugin to a reusable function and call it when needed.
+
+*themes/one-ring/javascript/scripts.js*
+```js
+(function($) {
+  var applyChosen = function (selector) {
+    if ($(selector).length) {
+      $(selector).chosen({
+        allow_single_deselect: true,
+        disable_search_threshold: 12
+      });
+    }
+  };
+  $(function () {
+
+    applyChosen('select');
+    
+    //...
+```
+
+Now, on the successful ajax response, we'll reapply it.
+
+*themes/one-ring/javascript/scripts.js*
+```js
+  $.ajax(ajaxUrl)
+    .done(function (response) {
+      $('.main').html(response);
+      applyChosen('.main select');
+
+```
 
 ### Cache busting
 There's one last idiosyncrasy we need to sort out before we can call this finished. Let's just try paginating a few times, and clicking on a non-Ajax link that will take us to another page. Now click the back button. Yikes! We're only getting back the content for the Ajax request. You may not be able to replicate this in all browsers. Google Chrome seems to reliably reproduce the bug, though. So why is this happening?
@@ -309,6 +347,7 @@ We need to update our Javascript so that the Ajax request has a slightly differe
             $.ajax(ajaxUrl)
                 .done(function (response) {
                     $('.main').html(response);
+                    applyChosen('.main select');
                     $('html, body').animate({
                         scrollTop: $('.main').offset().top
                     });
