@@ -87,12 +87,12 @@ SilverStripe\Core\Injector\Injector:
         Formatter: %$SilverStripe\Logging\DetailedErrorFormatter
 ```
 
-Since email is a pretty agressive form of error notification, we probably don't want to sent it from anywhere other than the live environment. Let's put this in a conditional block.
+Since email is a pretty aggressive form of error notification, we probably don't want to sent it from anywhere other than the live environment. Let's put this in a conditional block.
 
 *mysite/_config/logging.yml*
 ```yml
     --- 
-    Name: live-logging
+    Name: lessons-live-logging
     Only:
       environment: live
     ---
@@ -108,15 +108,18 @@ A better option for low-level errors is writing to a log file. Let's set that up
 
 *mysite/_config/logging.yml*
 ```yml
-SilverStripe\Core\Injector\Injector:
-  Psr\Log\LoggerInterface: 
-    calls:
-      FileLogger: [ pushHandler, [ %$FileLogger ] ]
-  FileLogger:
-    class: Monolog\Handler\StreamHandler
-    constructor:
-      - "../errors.log"
-      - "notice"
+    ---
+    Name: lessons-all-logging
+    ---
+    SilverStripe\Core\Injector\Injector:
+      Psr\Log\LoggerInterface: 
+        calls:
+          FileLogger: [ pushHandler, [ %$FileLogger ] ]
+      FileLogger:
+        class: Monolog\Handler\StreamHandler
+        constructor:
+          - "../errors.log"
+          - "notice"
 ```
 
 
@@ -134,7 +137,7 @@ Email:
 
 Pretty straightforward, but we're forgetting something. We don't want this setting to apply to all environments. We need to ensure that this yaml is only loaded in the dev environment. We're not writing PHP, so we don't have the convenience of if/else blocks, but fortunately, the SilverStripe YAML parser affords us a basic API for conditional logic.
 
-*mysite/_config/config.yml*
+*mysite/_config/email.yml*
 ```yaml
     ---
     Name: dev-email
@@ -147,7 +150,7 @@ Pretty straightforward, but we're forgetting something. We don't want this setti
 
 Perhaps in the test and production environments, we want to monitor transactional email from a bit of a distance. We could force a BCC to our email address in that case.
 
-*mysite/_config/config.yml*
+*mysite/_config/email.yml*
 ```yaml
     ---
     Name: dev-email
