@@ -1,5 +1,6 @@
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 * An overview of environments
 * Setting up logging on different environments
 * Dealing with email
@@ -155,186 +156,129 @@ At the centre of dealing with Ajax responses is the use of includes in your Layo
 =======
 In this lesson we'll talk about filtering a list of items on a template. In a previous tutorial, we looked at filtering through form inputs. Now, we'll explore how to do that through the navigation.
 >>>>>>> Begin lesson 19
+=======
+In the previous tutorial, we activated most of the sidebar filters for our Travel Guides section. We left out the date archive filter, however, because it introduced some complexity. Let's now dive into that complexity and get it working.
+>>>>>>> Begin lesson 20
 
-## What we'll cover
-* Setting up new relationships
-* Adding lists of filter links
-* Setting up the filtered routes
-* Adding filtered link methods to DataObjects
-* Filtering through controller actions
-* Adding filter headers
+### Adding date filter links to the template
 
-Having a rich supply of data to work with is paramount to getting value out of this lesson, so once you get the code changes in place, it's a good idea to import the `database.sql` file that is included in the completed version of this lesson. It will provide you with a hundred or so randomly composed `ArticlePage` records that we'll be filtering.
+Looking at the template, we first have to generate a list of all the distinct month/year combinations for all the articles. Let's start by working backwards, and we want the end result to be on the template.
 
-## Setting up new relationships
+*themes/one-ring/templates/SilverStripe/Lessons/Layout/ArticleHolder.ss*
+```html
+  <!-- BEGIN ARCHIVES ACCORDION -->
+	<h2 class="section-title">Archives</h2>
+	<div id="accordion" class="panel-group blog-accordion">
+		<div class="panel">
+		<!--
+			<div class="panel-heading">
+				<div class="panel-title">
+					<a data-toggle="collapse" data-parent="#accordion" href="#collapseOne" class="">
+						<i class="fa fa-chevron-right"></i> 2014 (15)
+					</a>
+				</div>
+			</div>
+		-->
+			<div id="collapseOne" class="panel-collapse collapse in">
+				<div class="panel-body">
+					<ul>
+					<% loop $ArchiveDates %>
+						<li><a href="$Link">$MonthName $Year ($ArticleCount)</a></li>
+					<% end_loop %>
+					</ul>
+				</div>
+			</div>
+		</div>	
+	</div>
+	<!-- END  ARCHIVES ACCORDION -->
 
-Looking at our Travel Guides page, we see that there are a number of different filters we can apply in the sidebar. We have a list of categories, an archive of previous months and years, as well as tags. We won't be using tags for these articles, so let's remove that. We'll be replacing it with a filter for regions, because, optionally, each of these travel guides can pertain to a region.
-
-Before we add the filter, let's set up that relationship. We'll add a `has_one` to `Region` on `ArticlePage` and a `has_many` from `Region` back to `ArticlePage`.
-
-*mysite/code/ArticlePage.php*
-```php
-//...
-	private static $has_one = [
-		'Photo' => Image::class,
-		'Brochure' => File::class,
-		'Region' => Region::class,
-	];
-//...
-
-	public function getCMSFields()
-	{
-		//...
-		$fields->addFieldToTab('Root.Main', DropdownField::create(
-			'RegionID',
-			'Region',
-			Region::get()->map('ID','Title')
-		)->setEmptyString('-- None --'), 'Content');
-
-		return $fields;
-
-	}
 ```
+First off, these dates were grouped by year. We've commented that out for now. We can address that in a future tutorial on grouped lists. In the loop, each date entry has a `$Link` method that will go to the filtered article list, `$MonthName` and `$Year` properties, and an `$ArticleCount` property.
 
-*mysite/code/Region.php*
-```php
-//...
-	private static $has_many = [
-		'Articles' => ArticlePage::class,
-	];
-//...
-```
+This is all well and good, but what are these objects?
 
-Run a `dev/build?flush`. If you've already done the database import, there should be no changes to the database, but it's still critical to update the model.
+In the previous tutorial, we discussed dealing with arbitrary template data, and this is a perfect use case. These date archive objects need to be iterable in a loop, and they need dynamic properties. We'll need to define them as simple `ArrayData` objects.
 
-## Adding lists of filter links
-
-Now we can get into the meat of the lesson and start creating some filters.Let's look at our `ArticleHolderController` and make sure it can feed regions into its sidebar. Add a method called `Regions()` to `ArticleHolder` that simply dumps out all the regions on the Regions page.
+Let's build that list in the model of our `ArticleHolder` page type.
 
 *mysite/code/ArticleHolder.php*
 ```php
 //...
-class ArticleHolder extends Page {
+use SilverStripe\ORM\ArrayList;
+class ArticleHolder extends Page
+{
+	//...
 
-  //...
-	public function Regions ()
+	public function ArchiveDates()
 	{
-		$page = RegionsPage::get()->first();
+		$list = ArrayList::create();
 
-		if($page) {
-			return $page->Regions();
-		}
+		return $list;
 	}
-  //...
 ```
-In practice, you'd probably want to add a `sort()` and/or `limit()` to that list, but for demonstration purposes, a generic query will do fine.
+### Running a custom SQL query
 
-Note that we don't just want to dump out `Region::get()`. This is a common mistake. If the Regions page were ever deleted and replaced, you'd end up with orphaned Regions that would then end up in that list.
+We're going to need to run a pretty specific query against the database to get all of the distinct month/year pairs, and this actually pushes the boundaries and practicality of the ORM. In rare cases such as this one, we can execute arbitrary SQL using `DB::query()`.
 
-We'll need to add these to the template. Replace the "tags" section with the list of regions.
-
-*themes/one-ring/templates/SilverStripe/Lessons/Layout/ArticleHolder.ss*
-```html
-	</div>
-	<!-- END  ARCHIVES ACCORDION -->
-					
-	<h2 class="section-title">Regions</h2>
-	<ul class="categories">
-	<% loop $Regions %>
-		<li><a href="$ArticlesLink">$Title <span>($Articles.count)</span></a></li>
-	<% end_loop %>
-	</ul>
-	
-	<!-- BEGIN LATEST NEWS -->
-	<h2 class="section-title">Latest News</h2>
-```
-
-Getting the number of articles associated with the region is a simple call to the `Articles` relation. Every list in SilverStripe (the `SS_List` interface) exposes a `count()` method.
-
-Notice that we're calling a non-existent method on `Region` called `$ArticlesLink`. This will return a URL to the Travel Guides section with the appropriate region filter applied. Don't worry about that just yet. We'll create it later in this lesson. It's just a placeholder for now.
-
-While we're in this section, we should light up the list of categories in the sidebar. This is actually a bit easier than the list of regions, because `ArticleHolder` already has a `has_many` for `Categories`.
-
-*themes/one-ring/templates/SilverStripe/Lessons/Layout/ArticleHolder.ss*
-```html
-	<!-- BEGIN SIDEBAR -->
-	<div class="sidebar gray col-sm-4">
-		
-		<h2 class="section-title">Categories</h2>
-		<ul class="categories">
-		<% loop $Categories %>
-			<li><a href="$Link">$Title <span>($Articles.count)</span></a></li>
-		<% end_loop %>
-		</ul>
-```
-
-Again, we invoke the aggregate method `count()` against the `ArticleCategory` object to get the number of articles it relates to. We can do this thanks to the `belongs_many_many` we defined on `ArticleCategory`.
-
-Take a look in *ArticleCategory.php*. Remember this?
-```php
-	private static $belongs_many_many = [
-		'Articles' => ArticlePage::class,
-	];
-```
-
-It's now coming in really useful!
-
-Like we did before, we've called a non-existent `Link()` method on the category object that we'll define later. 
-
-Refresh the page and see that our categories are appearing correctly.
-
-If you're wondering about the difference in semantics (`ArticlesLink()` vs `Link()`), it's just a matter of context. An `ArticleCategory` object's canonical link should be to a list of articles. It really isn't used anywhere else. A region, however, has its own detail page, so `Link()` is already claimed for that canonical state. Using a region to filter a list of articles is a special use of a region, so we should use a specially named method.
-
-We're going to save the date archive links until the next lesson, as it introduces some complexity, but we'll lay down the basics. Let's get a few things working before we dive into that.
-
-## Setting up the filtered routes
-
-Let's think about what we want out of these links. We essentially have four states:
-
-* The default state (no filters)
-* Filtered by region
-* Filtered by category
-* Filtered by date
-
-A good place to start is to envision what you want the routes to look like for each one of these states. We can pretty easily imagine something like this:
-
-* `travel-guides/region/123` (show articles related to Region ID #123)
-* `travel-guides/category/123` (show articles related to Category ID #123)
-* `travel-guides/date/2017/05` (show articles from May 2017)
-
-Optionally, it may be nice if we allowed the user to omit the month to show an entire year. Intuitive and semantically correct URL routes always earn big points.
-
-The first thing we'll need in our controller is a list of allowed actions.
-
-*mysite/code/ArticleHolderController.php*
+*mysite/code/ArticleHolder.php*
 ```php
 //...
-class ArticleHolderController extends PageController
-{
+use SilverStripe\ORM\ArrayList;
+use SilverStripe\Versioned\Versioned;
+use SilverStripe\ORM\Queries\SQLSelect;
 
-	private static $allowed_actions = [
-		'category',
-		'region',
-		'date'
-	];
+class ArticleHolder extends Page
+{
+	public function ArchiveDates()
+	{
+		$list = ArrayList::create();
+		$stage = Versioned::get_stage();		
+
+		$query = SQLSelect::create()
+		    ->selectField("DATE_FORMAT(`Date`,'%Y_%M_%m')","DateString")
+			  ->setFrom("ArticlePage_{$stage}")
+			  ->setOrderBy("Date", "ASC")
+			  ->setDistinct(true);
+		
+		$result = $query->execute();
+```
+To work outside the ORM, we can use the `SilverStripe\ORM\Queries\SQLSelect` class to procedurally build a string of selecting SQL. We pass an empty array to the constructor, because by default it will select `*`. We then just build the query using self-descriptive, chainable methods.
+
+The main advantage to this layer of abstraction is that it's platform agnostic, so that if someday you change database platforms, you don't need to update any syntax. All select queries end up in `SQLSelect` eventually. `SiteTree::get()` is just a higher level of abstraction that builds an `SQLSelect` object. To build a really custom query, we're just going further down the food chain, so to speak.
+
+One major drawback of working outside the ORM is that we can no longer take versioning for granted. We have to be explicit about what table we want to select from. It is therefore imperative to check the current stage, and apply the necessary suffix to the table, e.g. *ArticlePage_Live*. Again, it's rare that you have to deal with stuff like this.
+
+Don't worry too much if this query is over your head. It's not often that we have to do things like this. What this query is doing is creating a SKU for each article that contains its year, month number, and month name, separated by underscores, like this:
+
+```
+2015_05_May
 ```
 
-Since we've updated a private static variable, be sure to run `?flush` at this point.
+We then use the `setDistinct()` method to ensure we only get one of each.
 
-## Adding filtered link methods to DataObjects
+If you're wondering why we need the month name, as the year and month number are enough to satisfy the `DISTINCT` flag on their own, the answer is, we don't really need it, but it will help. We're getting the month name only for semantic purposes, to save time when we create the links on the template. The friendly month name is needed for the link text, but the month number is what we need for the URL.
 
-Now that we know what our routes will look like, let's get back to the `Region` and `ArticleCategory` classes to define those link methods.
+Now all we have to do is loop through that database result to create our final list of date objects.
 
-*mysite/code/Region.php*
+*mysite/code/ArticleHolder.php*
 ```php
-  //...
-	public function ArticlesLink()
-	{
-		$page = ArticleHolder::get()->first();
+		if ($result) {
+			while($record = $result->nextRecord()) {
+				list($year, $monthName, $monthNumber) = explode('_', $record['DateString']);
 
-		if($page) {
-			return $page->Link('region/'.$this->ID);
+				$list->push(ArrayData::create(array(
+					'Year' => $year,
+					'MonthName' => $monthName,
+					'MonthNumber' => $monthNumber,
+					'Link' => $this->Link("date/$year/$monthNumber"),
+					'ArticleCount' => ArticlePage::get()->where([
+							"DATE_FORMAT(\"Date\",'%Y_%m')" => "{$year}_{$monthNumber}",
+							"\"ParentID\"" => {$this->ID}
+						])->count()
+				)));
+			}
 		}
+<<<<<<< HEAD
 	}
 <<<<<<< HEAD
 	//...
@@ -342,83 +286,78 @@ Now that we know what our routes will look like, let's get back to the `Region` 
 =======
   //...
 >>>>>>> Begin lesson 19
+=======
+>>>>>>> Begin lesson 20
 ```
 
-It's always a good idea to put a guard around the page actually existing. Never assume that the site tree will always be the same. This can cause real problems when a user has installed the project from the code repository but has not yet imported a database.
+We loop through each record using the `nextRecord()` method. For each record, we explode the SKU into its component variables -- the year, the month number, and the month name -- and assign them to properties of an `ArrayData` object. We also create a link to the `date/$year/$monthNumber` route that we created in `ArticleHolder`. Lastly, we run a query against `ArticlePage` to get the number of articles that match this date SKU. Notice that in this case, we can safely just match the year and month number.
 
-Interesting to note, the `LinkingMode()` method in our `Region` object is agnostic enough to still work on our `ArticleHolder` page:
+Notice that the `where()` method affords us parameterised queries. The shorthand of `'fieldName' => 'value'` should be used whenever possible to ensure your queries are safe from injection.
 
+Here's the complete `ArchiveDates()` function:
+
+*mysite/code/ArticleHolder.php*
 ```php
-	public function LinkingMode()
+	public function ArchiveDates()
 	{
-		return Controller::curr()->getRequest()->param('ID') == $this->ID ? 'current' : 'link';
-	}
+		$list = ArrayList::create();
+		$stage = Versioned::current_stage();
+
+		$query = SQLSelect::create();
+		    ->selectField("DATE_FORMAT(`Date`,'%Y_%M_%m')","DateString")
+			  ->setFrom("ArticlePage_{$stage}")
+			  ->setOrderBy("Date", "ASC")
+			  ->setDistinct(true);
+		
+		$result = $query->execute();
+		
+		if($result) {
+			while($record = $result->nextRecord()) {
+				list($year, $monthName, $monthNumber) = explode('_', $record['DateString']);
+
+				$list->push(ArrayData::create(array(
+					'Year' => $year,
+					'MonthName' => $monthName,
+					'MonthNumber' => $monthNumber,
+					'Link' => $this->Link("date/$year/$monthNumber"),
+					'ArticleCount' => ArticlePage::get()->where([
+							"DATE_FORMAT(\"Date\",'%Y_%m')" => "{$year}_{$monthNumber}",
+							"\"ParentID\"" => {$this->ID}
+						])->count()
+				)));
+			}
+		}
 ```
 
-Let's now add the `Link()` method to the categories.
+Alright, get up, walk around. Have a (non-alcoholic) drink. Then refresh the page to see the fruits of your labour.
 
-*mysite/code/ArticleCategory.php*
-```php
-   //...
-	public function Link()
-	{
-		return $this->ArticleHolder()->Link(
-			'category/'.$this->ID
-		);
-	}
-  //...
-```
+### Applying the date filter in the controller
 
-Refresh the page and see that the categories and regions link to the correct URLs.
-
-
-## Filtering through controller actions
-
-Let's start by defining the base list of articles. We know at minimum that we want only articles that are children of this page, sorted in reverse chronological order. `ArticlePage::get()->sort('Date DESC')` may yield the same thing, but in the long term, that's not a great solution. We may someday have multiple `ArticleHolder` pages.
-
-Ultimately what we want is for the controller to start with this base list, and each controller action will filter it down further. This is a great use case for the `init()` method, as it is executed before any actions.
+The last thing we need to do to make the date archive work is set up that controller action to deal with the incoming `date/$year/$month` routes.
 
 *mysite/code/ArticleHolderController.php*
 ```php
-//...
 class ArticleHolderController extends PageController
 {
-
+	
 	//...
 
-	protected $articleList;
-
-	protected function init ()
+	public function date(HTTPRequest $r)
 	{
-		parent::init();
+		$year = $r->param('ID');
+		$month = $r->param('OtherID');
 
-		$this->articleList = ArticlePage::get()->filter([
-			'ParentID' => $this->ID
-		])->sort('Date DESC');
+		if(!$year) return $this->httpError(404);
+
+		$startDate = $month ? "{$year}-{$month}-01" : "{$year}-01-01";
+		
+		if(strtotime($startDate) === false) {
+			return $this->httpError(404, 'Invalid date');
+		} 
 	}
 ```
 
-If you're wondering why we don't just use `Children()`, which effectively does the same thing, that's because `Children()` is a special method that modifies its list post-query. It actually returns an `ArrayList`, not a `DataList`, which would preclude us from adding filters.
-
-We're going to want the articles paginated, so let's create a method that applies a `PaginatedList` to the `$articleList` member variable. This will be our single point of access to the list of articles that we're building.
-
-*mysite/code/ArticleHolderController.php*
-```php
-//...
-use SilverStripe\ORM\PaginatedList;
-
-class ArticleHolderController extends PageController
-{
-  //...
-	public function PaginatedArticles ($num = 10)
-	{		
-		return PaginatedList::create(
-			$this->articleList,
-			$this->getRequest()
-		)->setPageLength($num);
-	}
-```
-
+<<<<<<< HEAD
 Back in the template, change the `<% loop %>` block to use the `$PaginatedArticles` method.
 
 *themes/one-ring/templates/SilverStripe/Lessons/Layout/ArticleHolder.ss*
@@ -486,11 +425,15 @@ Take a deep breath, and copy and paste away. No one will know. Just make sure yo
 	<% end_if %>
 	<!-- END PAGINATION -->
 ```
+=======
+We'll start by running a sanity check to ensure that we at least have a year in the URL. Then, we'll create a start date of either the first of the month or the first of the year. If for some reason the year or month values are invalid, and don't pass the `strtotime()` test, we throw an HTTP error.
+>>>>>>> Begin lesson 20
 
-Now we're ready to add our first filter, for category. Let's define the `category()` action.
+Now, we'll create the boundary for the end date, and run the query.
 
 *mysite/code/ArticleHolderController.php*
 ```php
+<<<<<<< HEAD
 <<<<<<< HEAD
 >>>>>>> Begin lesson 18
 	public function index(HTTPRequest $request)
@@ -624,17 +567,26 @@ Perhaps in the test and production environments, we want to monitor transactiona
 			return $this->httpError(404,'That category was not found');
 		}
 >>>>>>> Begin lesson 19
+=======
+		$adder = $month ? '+1 month' : '+1 year';
+		$endDate = date('Y-m-d', strtotime(
+		    $adder, 
+				strtotime($startDate)
+		));
+>>>>>>> Begin lesson 20
 
 		$this->articleList = $this->articleList->filter([
-			'Categories.ID' => $category->ID
+			'Date:GreaterThanOrEqual' => $startDate,
+			'Date:LessThan' => $endDate 
 		]);
 
 		return [
-			'SelectedCategory' => $category
+			'StartDate' => DBField::create_field('DateTime', $startDate),
+			'EndDate' => DBField::create_field('DateTime', $endDate)
 		];
-	}
 ```
 
+<<<<<<< HEAD
 We start first by checking if the category exists. If not, we throw a 404. Then, we update the article list by filtering the current one against the `many_many` relation, `Categories`. This is a wonderful example of the power of the ORM. Its abstraction layer allows us to filter by a parameter that is not necessarily a field in the database, but rather, a named relationship in our code. The filter `Categories.ID => $category->ID` simply asks for all the articles that contain the given category ID in their list of their related category IDs.
 
 <<<<<<< HEAD
@@ -652,49 +604,67 @@ Just like our custom variable `Results`, we'll pass the `ActiveFilters` list to 
 =======
 At the end of the function, we return the selected category to the template. This will be important when adding text to the page that shows the filtered state.
 >>>>>>> Begin lesson 19
+=======
+A really key detail of this function is that we return proper `SilverStripe\ORM\FieldType\DBField` objects to the template. If you'll remember from the early tutorials, controllers don't just return scalar values to the template. They're actually first-class, intelligent objects. By default, they're cast as `Text` objects, so we'll be more explicit and ensure that `StartDate` and `EndDate` are cast as dates. This will afford us the option to format them on the template.
+>>>>>>> Begin lesson 20
 
-Notice also that we don't return a list of articles in the controller action. The articles are going to be paginated, and we want to avoid the redundancy of creating a `PaginatedList` in each controller action. We'll create a central place for that to happen in just a bit.
+You can achieve the same result more declaratively using the `$casting` setting on in your controller. We'll discuss that in a future tutorial and clean this up a bit.
 
-Test it out and see that the new filtered category state is working as expected.
-
-Let's add our next filter for regions. It will work much the same way.
+For now, here is the complete `date()` controller action:
 
 *mysite/code/ArticleHolderController.php*
 ```php
 //...
-use SilverStripe\Control\HTTPRequest;
+use SilverStripe\ORM\FieldType\DBField;
 
 class ArticleHolderController extends PageController
 {
+	
 	//...
 
-	public function region (HTTPRequest $r)
+	public function date(HTTPRequest $r)
 	{
-		$region = Region::get()->byID(
-			$r->param('ID')
-		);
+		$year = $r->param('ID');
+		$month = $r->param('OtherID');
 
-		if(!$region) {
-			return $this->httpError(404,'That region was not found');
+		if(!$year) return $this->httpError(404);
+
+		$startDate = $month ? "{$year}-{$month}-01" : "{$year}-01-01";
+		
+		if(strtotime($startDate) === false) {
+			return $this->httpError(404, 'Invalid date');
 		}
 
+		$adder = $month ? '+1 month' : '+1 year';
+		$endDate = date('Y-m-d', strtotime(
+		    $adder, 
+				strtotime($startDate)
+		));
+
 		$this->articleList = $this->articleList->filter([
-			'RegionID' => $region->ID
+			'Date:GreaterThanOrEqual' => $startDate,
+			'Date:LessThan' => $endDate 
 		]);
 
 		return [
-			'SelectedRegion' => $region
+			'StartDate' => DBField::create_field('DateTime', $startDate),
+			'EndDate' => DBField::create_field('DateTime', $endDate)
 		];
-	}
-```
 
+	}
+
+<<<<<<< HEAD
 <<<<<<< HEAD
 Reload the page, and you should have working filter buttons now!
 >>>>>>> Begin lesson 18
 =======
 Test the regions filter in your browser and see that it's working.
+=======
+	//...
+```
+>>>>>>> Begin lesson 20
 
-## Adding filter headers
+Refresh the browser and try clicking on some of the date archive links, and see that you're getting the expected results.
 
 The last thing we need to do is pull our filter headers into the listings to show the user the state of the list. Each controller action returns its own custom template variables that we can check.
 
@@ -706,10 +676,15 @@ The last thing we need to do is pull our filter headers into the listings to sho
 				<h3>Region: $SelectedRegion.Title</h3>
 			<% else_if $SelectedCategory %>
 				<h3>Category: $SelectedCategory.Title</h3>
+			<% else_if $StartDate %>
+				<h3>Showing $StartDate.Full to $EndDate.Full</h3>
 			<% end_if %>
 
 ```
-Give that a try and see that you now get some nice headings showing the state of the list.
 
+<<<<<<< HEAD
 One missing piece you'll notice is that the detail page still has a static sidebar. Getting this to work requires teaching a new concept, and we'll address that in the next couple of lessons.
 >>>>>>> Begin lesson 19
+=======
+This is where having proper `SilverStripe\ORM\FieldType\Datetime` objects comes in really handy, as we can format the date right on the template.
+>>>>>>> Begin lesson 20
