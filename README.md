@@ -233,18 +233,23 @@ class ArticleHolder extends Page
 	{
 		$list = ArrayList::create();
 		$stage = Versioned::get_stage();		
+    $baseTable = ArticlePage::getSchema()->tableName(ArticlePage::class);
+    $tableName = $stage === Versioned::LIVE ? "{$baseTable}_Live" : $baseTable;
 
-		$query = SQLSelect::create()
-		    ->selectField("DATE_FORMAT(`Date`,'%Y_%M_%m')","DateString")
-			  ->setFrom("ArticlePage_{$stage}")
-			  ->setOrderBy("Date", "ASC")
-			  ->setDistinct(true);
-		
-		$result = $query->execute();
+    $query = SQLSelect::create()
+        ->setSelect([])
+        ->selectField("DATE_FORMAT(`Date`,'%Y_%M_%m')", "DateString")
+        ->setFrom($tableName)
+        ->setOrderBy("DateString", "ASC")
+        ->setDistinct(true);
+
+    $result = $query->execute();
 ```
 To work outside the ORM, we can use the `SilverStripe\ORM\Queries\SQLSelect` class to procedurally build a string of selecting SQL. We pass an empty array to the constructor, because by default it will select `*`. We then just build the query using self-descriptive, chainable methods.
 
 The main advantage to this layer of abstraction is that it's platform agnostic, so that if someday you change database platforms, you don't need to update any syntax. All select queries end up in `SQLSelect` eventually. `SiteTree::get()` is just a higher level of abstraction that builds an `SQLSelect` object. To build a really custom query, we're just going further down the food chain, so to speak.
+
+We get the name of the table for `ArticlePage` from the `DataObjectSchema` class. This class contains a lot of valuable information for introspecting the abstractions of the ORM. You can ask it for the table name for a given class, get the database column for a given field, get all the database fields for a given class, and much more. In this case, we get the table name from the schema. Table names are user-configurable, but by default it follows the simple pattern of replacing the backslashes in the fully-qualified class name to underscores. In this case, `SilverStripe_Lessons_ArticlePage` is returned by the `tableName` function.
 
 One major drawback of working outside the ORM is that we can no longer take versioning for granted. We have to be explicit about what table we want to select from. It is therefore imperative to check the current stage, and apply the necessary suffix to the table, e.g. *ArticlePage_Live*. Again, it's rare that you have to deal with stuff like this.
 
@@ -256,7 +261,7 @@ Don't worry too much if this query is over your head. It's not often that we hav
 
 We then use the `setDistinct()` method to ensure we only get one of each.
 
-If you're wondering why we need the month name, as the year and month number are enough to satisfy the `DISTINCT` flag on their own, the answer is, we don't really need it, but it will help. We're getting the month name only for semantic purposes, to save time when we create the links on the template. The friendly month name is needed for the link text, but the month number is what we need for the URL.
+If you're wondering why we need the month name *and* the month number. The year and month number are enough to satisfy the `DISTINCT` flag on their own. The answer is, we don't really *need* it, but it will help us out later. We're getting the month name only for semantic purposes, to save time when we create the links on the template. The friendly month name is needed for the link text, but the month number is what we need for the URL.
 
 Now all we have to do is loop through that database result to create our final list of date objects.
 
@@ -266,16 +271,16 @@ Now all we have to do is loop through that database result to create our final l
 			while($record = $result->nextRecord()) {
 				list($year, $monthName, $monthNumber) = explode('_', $record['DateString']);
 
-				$list->push(ArrayData::create(array(
+				$list->push(ArrayData::create([
 					'Year' => $year,
 					'MonthName' => $monthName,
 					'MonthNumber' => $monthNumber,
 					'Link' => $this->Link("date/$year/$monthNumber"),
 					'ArticleCount' => ArticlePage::get()->where([
 							"DATE_FORMAT(\"Date\",'%Y_%m')" => "{$year}_{$monthNumber}",
-							"\"ParentID\"" => {$this->ID}
+							"\"ParentID\"" => $this->ID
 						])->count()
-				)));
+				]));
 			}
 		}
 <<<<<<< HEAD
@@ -301,32 +306,37 @@ Here's the complete `ArchiveDates()` function:
 	public function ArchiveDates()
 	{
 		$list = ArrayList::create();
-		$stage = Versioned::current_stage();
+		$stage = Versioned::get_stage();		
+    $baseTable = ArticlePage::getSchema()->tableName(ArticlePage::class);
+    $tableName = $stage === Versioned::LIVE ? "{$baseTable}_Live" : $baseTable;
 
-		$query = SQLSelect::create();
-		    ->selectField("DATE_FORMAT(`Date`,'%Y_%M_%m')","DateString")
-			  ->setFrom("ArticlePage_{$stage}")
-			  ->setOrderBy("Date", "ASC")
-			  ->setDistinct(true);
+    $query = SQLSelect::create()
+        ->setSelect([])
+        ->selectField("DATE_FORMAT(`Date`,'%Y_%M_%m')", "DateString")
+        ->setFrom($tableName)
+        ->setOrderBy("DateString", "ASC")
+        ->setDistinct(true);
+
+    $result = $query->execute();
 		
-		$result = $query->execute();
-		
-		if($result) {
+		if ($result) {
 			while($record = $result->nextRecord()) {
 				list($year, $monthName, $monthNumber) = explode('_', $record['DateString']);
 
-				$list->push(ArrayData::create(array(
+				$list->push(ArrayData::create([
 					'Year' => $year,
 					'MonthName' => $monthName,
 					'MonthNumber' => $monthNumber,
 					'Link' => $this->Link("date/$year/$monthNumber"),
 					'ArticleCount' => ArticlePage::get()->where([
 							"DATE_FORMAT(\"Date\",'%Y_%m')" => "{$year}_{$monthNumber}",
-							"\"ParentID\"" => {$this->ID}
+							"\"ParentID\"" => $this->ID
 						])->count()
-				)));
+				]));
 			}
 		}
+		
+		return $list;
 ```
 
 Alright, get up, walk around. Have a (non-alcoholic) drink. Then refresh the page to see the fruits of your labour.
@@ -347,11 +357,11 @@ class ArticleHolderController extends PageController
 		$year = $r->param('ID');
 		$month = $r->param('OtherID');
 
-		if(!$year) return $this->httpError(404);
+		if (!$year) return $this->httpError(404);
 
 		$startDate = $month ? "{$year}-{$month}-01" : "{$year}-01-01";
 		
-		if(strtotime($startDate) === false) {
+		if (strtotime($startDate) === false) {
 			return $this->httpError(404, 'Invalid date');
 		} 
 	}
@@ -581,8 +591,8 @@ Perhaps in the test and production environments, we want to monitor transactiona
 		]);
 
 		return [
-			'StartDate' => DBField::create_field('DateTime', $startDate),
-			'EndDate' => DBField::create_field('DateTime', $endDate)
+			'StartDate' => DBField::create_field('Datetime', $startDate),
+			'EndDate' => DBField::create_field('Datetime', $endDate)
 		];
 ```
 
@@ -627,11 +637,11 @@ class ArticleHolderController extends PageController
 		$year = $r->param('ID');
 		$month = $r->param('OtherID');
 
-		if(!$year) return $this->httpError(404);
+		if (!$year) return $this->httpError(404);
 
 		$startDate = $month ? "{$year}-{$month}-01" : "{$year}-01-01";
 		
-		if(strtotime($startDate) === false) {
+		if (strtotime($startDate) === false) {
 			return $this->httpError(404, 'Invalid date');
 		}
 
@@ -647,8 +657,8 @@ class ArticleHolderController extends PageController
 		]);
 
 		return [
-			'StartDate' => DBField::create_field('DateTime', $startDate),
-			'EndDate' => DBField::create_field('DateTime', $endDate)
+			'StartDate' => DBField::create_field('Datetime', $startDate),
+			'EndDate' => DBField::create_field('Datetime', $endDate)
 		];
 
 	}
@@ -677,14 +687,30 @@ The last thing we need to do is pull our filter headers into the listings to sho
 			<% else_if $SelectedCategory %>
 				<h3>Category: $SelectedCategory.Title</h3>
 			<% else_if $StartDate %>
-				<h3>Showing $StartDate.Full to $EndDate.Full</h3>
+				<h3>Showing $StartDate.Date to $EndDate.Date</h3>
 			<% end_if %>
 
 ```
 
+<<<<<<< HEAD
 <<<<<<< HEAD
 One missing piece you'll notice is that the detail page still has a static sidebar. Getting this to work requires teaching a new concept, and we'll address that in the next couple of lessons.
 >>>>>>> Begin lesson 19
 =======
 This is where having proper `SilverStripe\ORM\FieldType\Datetime` objects comes in really handy, as we can format the date right on the template.
 >>>>>>> Begin lesson 20
+=======
+We'll also add the dates to the articles themselves, removing the static dates that are there now.
+
+*themes/one-ring/templates/SilverStripe/Lessons/Layout/ArticleHolder.ss*
+```html
+  <div class="info-blog">
+    <ul class="top-info">
+      <li><i class="fa fa-calendar"></i> $Date.Nice</li>
+      <li><i class="fa fa-comments-o"></i> 2</li>
+      <li><i class="fa fa-tags"></i> $CategoriesList</li>
+    </ul>
+```
+
+This is where having proper `SilverStripe\ORM\FieldType\Datetime` objects comes in really handy, as we can format the date right on the template.
+>>>>>>> Lesson 20 complete
