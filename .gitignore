@@ -24,3 +24,11 @@
 /themes/simple/
 /versioned/
 /testsession/
+
+# ignore error log
+errors.log
+
+# ignore project modules
+/blog/
+/lumberjack/
+/tagfield/
