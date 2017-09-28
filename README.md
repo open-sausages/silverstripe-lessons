@@ -1,179 +1,166 @@
-We'll begin by adding and improving tests for our module. We'll learn about a few SilverStripe tools, and use them to increase test coverage for the important parts of our code.
+In the previous lesson, we covered how to install a thirdparty module. We'll now discuss how to create your own module to share with the community.
 
-Then we'll connect our module to continuous integration services. These will monitor our code and let us know when tests break or code quality declines.
-
-We'll document our module, and learn about some of the ways SilverStripe uses this documentation to power silverstripe.org.
-
-Then we'll learn about the new code style guidelines and use tools to format our code automatically for us.
-
-We'll add a few community files. These will help new users get to grips with our module and new contributors to know exactly how they can contribute to our module.
-
-Finally we'll add our module to Packagist, so it can be installed in many SilverStripe sites.
-
-We've got a lot of exciting, new stuff to cover. So let's get to it!
-
-## Adding/improving tests
-
-There is a lot of information out there, on testing. So it's important that we better define what we want to focus on. You can think of tests as a secondary codebase which ensures our primary codebase (or in this case the module we're building) works correctly.
-
-We don't technically need tests to make a module, in much the same way as one doesn't technically need a script to make a movie. It's just a really good idea to have a script. Similarly, it's a good idea to have tests so we know our module is doing exactly what it should be doing.
-
-Some people like to write tests before they write any other code. This is often called Test-Driven Development (or TDD for short). It's an interesting way to build software, and one I highly recommend you try.
-
-We've already got a module to work with, so we're adding the tests after. Still, having tests (whether we made them before or after the rest of our code) is still better than having no tests. 
-
-### How many tests do we need?
-
-So how many tests do we need? This is an interesting question because the answer is; "well it depends". We write tests because we want to know our module works. How many tests we write depends on how many it takes to ensure our code does what it needs to do, well.
-
-The number of tests is less important than the amount of code they test. After all, I can write 100 tests which check small variations of the same code, but they'll start to decrease in value. 
-
-No - what we want to do is cover the important parts of our code in enough tests to make sure our code does what it needs. This is referred to as Test Coverage (or the percentage of code which has any corresponding tests).
-
-### What kinds of tests are there?
-
-It can be confusing, when first learning about testing, to hear about all the different types of tests it is possible to write. Testing is full of jargon, so it's again helpful for us to decide what kinds of tests we want to write:
-
-#### Unit tests
-
-Unit tests are the smallest, and often the most complicated, tests we can write. Like their name suggests, we write unit tests to ensure individual units of code work as expected. 
-
-Given a class of 4 public methods, we'll write at least 1 unit test for each method, to assert that each method does exactly what is needs to with any input.
-
-As a side-note: did you notice the structure of my last statement? Given some pre-conditions, when something happens we assert an outcome. That's an important structure: we'll see again and again.
-
-Unit tests are meant to be very small in scope, checking the output of a single method at a time. The less code being tested by a single unit test, the better.
-
-This is what makes them so complicated. We sometimes have to take steps to ensure that we're only testing a single method. Usually these steps take the form of replacing real objects with fake objects. 
-
-This is where it becomes important for our methods not to have side-effects or multiple responsibilities. When our methods have side-effects then out tests need to account for changes outside of a single method. When our methods have multiple responsibilities then our test balloon out of proportion.
-
-#### Functional tests
-
-Functional tests are a little more down-to-earth, in the sense that they allow interaction between many objects. With functional tests, we're no longer trying to test a single method but rather a small slice of the whole system.
-
-To illustrate the difference: a unit test might only test that image-manipulation functions are called by a gallery class' render function, but a functional test might compare a resized  gallery image to a set of expected images.
-
-In fact, this kind of "set of expected images" is called a fixture, and is often an easy way to distinguish functional tests from unit tests.
-
-You see, functional tests forgo using the fake objects that unit tests do, by using real objects. Functional tests focus on the interactions of multiple processes or methods; testing real-world inputs and real-world outputs.
-
-#### Acceptance tests
-
-Acceptance tests are a high-level overview of the functionality of a module or application. In PHP, these often take the form of; "given a URL, when I click these things then  something intended happens". 
-
-Acceptance tests are similar to functional tests in that they test a slice of the whole application. But where functional tests are of the interactions of multiple objects or methods: acceptance tests are to assert that the system as a whole fulfils a requirement.
-
-As a result, acceptance tests often resemble user-stories. They're the answer to the question; "does this part of my module or application do what I intended it to" without the gritty implementation details getting in the way.
-
-### What tests should I write?
-
-SilverStripe modules usually have functional tests. This is often the case with add-ons to frameworks, as they'll depend on some framework functionality. 
-
-It's often too difficult to fake every part of the framework, in order to test a single method. Side-effects and interactions are prevalent, especially when dealing with modules that add functionality to a pre-constructed CMS interface.
-
-Functional testing allows us to insert database records, trap emails that have been sent or even simulate browser requests. It can be slightly harder to narrow down the location of bugs, than with unit testing, but it is easier to detect the presence of bugs between objects.
-
-Acceptance tests are also common, especially with modules that add visible features to the CMS. It's easier to understand and write tests that replicate how we would normally interact with a system. "When I go to my profile, and click the edit button, I am presented with a form" is understandable because it's an expression of what we might actually do in a browser.
-
-Given these three types of tests, we're going to focus on functional tests. It's possible to write all three kinds, in a SilverStripe project, but I think functional tests will give us the most value in the shortest amount of time.
-
-## Connecting to CI services
-
-Continuous Integration (or CI for short) is what we call web services which continuously monitor our code and applications. There are many of these kinds of services, but we're going to focus on two: Travis and Scrutinizer.
-
-Travis is a testing service. When we connect it to our Github repositories, it will test the code that we commit to them. If there are errors, we can see this by adding a badge to our readme.
-
-Similarly, Scrutninizer checks our repository every time we commit code to it; but what it's checking is code quality. There are a number of metrics it can apply to guess if our code is readable, free of errors and extendable.
-
-### Configuring Travis
-
-We tell Travis how to test our applications, but creating a file called `.travis.yml`. In this file we can list things like the versions of PHP we want to test our application against, and the environment variables it should set beforehand. These environment variables can reflect difference versions of SilverStripe to test against or different database providers to test against.
-
-If our tests need special dependencies installed beforehand, this is the best place to define how those are loaded before the tests are run. The Travis file supports different kinds of events, like `before_script` or `after_success`. Not only can we change the system before, but we can also do things depending on whether the tests passed or failed...
-
-### Connecting Travis
-
-Once we've got that config ready to go, it's time to plug the module into Travis. Create an account and log into Travis. You can connect with your Github account, so there should be little to no setup required for this.
-
-Go to the "Accounts" section and click "Sync". If you can't see the organisation the module is in; you probably have to request access to it by clicking on the "Renew and add" link on the bottom left.
-
-Find the organisation where the module is, and click "Grant access". Another "Sync" should do it. Enable the module repository and Travis should start watching for changes.
-
-### Configuring Scrutinizer
-
-We configure Scrutinizer in the same way. First we create a file called `.scrutinizer.yml`. Then we tell Scrutinizer what language our module is in. Scrutinizer supports multiple languages, including Python and Ruby, which is helpful to remember if we're ever coding in those and need some quality control...
-
-We add instructions for which checks to run. Overall there are fewer things to define here than in Travis' config file, so it shouldn't take all that long.
-
-### Connecting Scrutinizer
-
-Connecting Scrutinizer is just as easy as Travis. Create an account and log in. You can also use a Github account for this. Then click "Add repository". Then add the user/repo part of Github URL and pick PHP from the list of languages.
-
-Don't worry about running the tests here. We could but it's better for us to run them just with Travis because we can do more there.
-
-Click "Add Repository" and we're done here. We'll keep these tabs open to see when the tests and inspections are run...
-
-## Adding/improving docs
-
-As we change and improve our module, we're going to want to keep the docs up to date. If you don't have any docs, now is a good time to make some.
-
-Docs are an excellent way for other developers (and even users) to see what your module offers. Perhaps your module adds some CMS fields, or a new front-end section. The one we're building here adds a new field to the CMS, so we could use docs for developers and CMS users alike.
-
-Docs are best kept in `docs/en`. You can structure them any way you like, but I find it best to begin with `index.md`, `introduction.md` or `getting-started.md`. Something like that is a good way to point readers to the place they will start with the documentation. The `.md` part is short for Markdown, which is an almost-plain-text language with support for some formatting elements, like headings and lists.
-
-You may also have heard of Github-flavoured Markdown (or GFM for short) which is a superset of Markdown, supporting code blocks and other useful formatting elements.
-
-When it comes to user documentation, it's best to put this in a `user-guide.md` file, or a folder of Markdown files called `user-guide`. That makes it obvious which parts of the documentation are for developers (or general consumption) and which parts are specifically for CMS users. It's also how we load this kind of documentation into sites like <userhelp.silverstripe.org> and <docs.silverstripe.org>.
-
-Let's introduce our module with a small code snippet, and screenshot. It's ok if you don't have one of these things. This is a good place to point out things like a contribution guide, code of conduct, license or even SemVer compliance. 
-
-Be sure to include as many images and code snippets as possible, so there are few unanswered questions about how to use your module. You can also include your name or Twitter handle for people to ask their questions on those platforms.
-
-Once you're done, commit and push those changes to Github. Now is a good time to see if Travis and Scrutinizer are automatically checking the repository.
-
-## Formatting code
-
-Let's move on to formatting our code. If you haven't already picked a code style guide for your work, may I suggest PSR-2? It's the recommended code style for SilverStripe Framework, CMS, and Supported Modules.
-
-It covers things like how to format whitespace and where to put braces. You can read up on it at <php-fig.org/psr/psr-2>. 
-
-Now, you don't have to remember all these rules when you're writing code. You'll gradually learn them, over time. For now, you can use an automated tool to re-format your code for you. It's called `php-cs-fixer` and you can download it through Composer...
-
-`php-cs-fixer` supports a number of different code styles, but  the one we're interested in is PSR-2. You can use it to transform your source files, and even check before you do with a dry-run.
-
-Try to keep commits where you format your code apart from commits where you add features and/or fix bugs. Mixing the two can make it harder for collaborators to understand the changes you've made, and often leads to longer review periods.
-
-Remember also that formatting shouldn't affect the behaviour of your code. You shouldn't need to bump the version number of your module just because you've applied some formatting...
-
-## Adding community files
-
-We're almost there! Now is a good time to add a few community files. You may have hinted at these in your docs or "readme" file. 
-
-I call them community files because they don't really help you personally, but they are a great help to other developers wanting to know how to use and/or contribute to your module.
-
-When I'm adding these files to my projects, I like to add separate contributing, change log, code of conduct, and license files. I also add common configuration files like `.gitattributes`, `.gitignore` and `.editorconfig`.
-
-### Which license should I choose?
-
-It can be tricky knowing which license to choose for your project. What do they all mean? Will you get in trouble if you choose the wrong one?
-
-#### A few common licenses
-
-- MIT
-- BSD
-- GPL
-
-MIT and BSD are permissive licenses. They allow modification and distribution. You can use code released under these to build whatever you like, and sell it if you so desire.
-
-SilverStripe Framework and CMS are released under BSD, as are many of the community modules. 
-
-On the other hand, GPL is a copyleft license, which basically means if you use GPL code in your module or project, that module or project also needs to be GPL. It's meant to keep code free.
-
-We feel BSD works well for us, so you might want to try it yourself. Whatever license you choose, you still own your code. But unless you have a clear license, nobody else is really allowed to use your code...
-
-You can learn more about these licenses (and others) at <https://opensource.org/licenses>.
-
-You might also want to add a Contributor License Agreement (or CLA for short) which tells contributors how their contributions will be re-licensed as part of regular releases of your module. we have one for SilverStripe, if you want to see an example: <https://docs.silverstripe.org/en/4/contributing/code/#contributing-code-submitting-bugfixes-and-enhancements>.
-
-Remember to tag a new release and make sure it is available on Packagist (like we learned about in the last lesson).
+## What we'll cover
+* Why and when to create a module
+* What we'll build
+* Anatomy of a module
+* Migrating project code into a module
+* Hosting on Github
+* Publishing on Packagist
+* Releasing your module
+
+## Why and when to create a module
+As you're building our your project, you're likely to find yourself writing code that could conceivably be used on one or many other projects that require the same, or at least a similar feature. When you identify code like this, you should consider pulling it out of your project and placing it into a module.
+
+Even if you can't imagine anyone but yourself reusing this code, consider modularising it anyway. There are a lot of developers out there, and you'd be surprised how frequently requirements overlap. But creating modules isn't always about altruism -- it is often symbiotic, and you may benefit yourself by releasing your code. With more eyes on your work, you may receive contributions that enhance the features, patch security holes, or maintain its compatibility with new releases of the CMS.
+
+For the most part, modules should do one thing, and we recommend keeping your modules as small as possible. This makes them more testable, and doesn't create an unnecessarily large footprint for the consumers of your module. A calendar module, for instance, should not handle bookings and registration, as that targets only a specific subset of people who want a calendar on their website. This is a case where you would want to create a separate module that injects those features, and declares the core calendar module as a dependency.
+
+In our case this is exactly the type of module we'll be creating.
+
+## What we'll build
+Now that we have the blog module installed, we've realised it's missing a key provision that we need for our site, and that is the ability to feature posts. We want the landing page of the blog to show a featured post at the top.
+
+Fortunately, an imaginary developer has written this code, and it's all been added to our `__assets/` directory. It's completely conceivable that other people would want featured posts, so let's create a module called `blog-featured-posts`.
+
+## Anatomy of a module
+In its most basic form, a module is simply another directory in the web root of your project. The only requirement is that the directory contain a `_config/` subdirectory, or a `_config.php` file immediately below it.
+
+So let's start by creating that folder in our web root, `blog-featured-posts/`. Directly below it, create a `_config/` folder.
+
+We'll also need to add this directory to our `.gitignore` file, so that it doesn't get tracked with the rest of our project.
+.gitignore
+```
+...
+...
+/blog-featured-posts/
+```
+
+## Migrating project code into a module
+Just like in your `mysite/` "module," all of our PHP classes will go into a subfolder called `code/`. Let's create that now.
+
+The featured posts functionality is injected almost entirely with code, so let's move the following files from `__assets/` to `blog-featured-posts/code`:
+* BlogExtension.php
+* BlogPostExtension.php
+* BlogCategoryExtension.php
+
+The only other bit we'll need for our module is the snippet of config YAML that applies these three extensions. You'll recall from our lesson on Data Extensions and SiteConfig that extensions are applied through the config layer.
+
+
+*log-featured-posts/_config/config.yml*
+```
+
+SilverStripe\Blog\Model\Blog:
+  extensions:
+    - SilverStripe\BlogFeaturedPosts\BlogExtension
+SilverStripe\Blog\Model\BlogPost:
+  extensions:
+    - SilverStripe\BlogFeaturedPosts\BlogPostExtension
+SilverStripe\Blog\Model\BlogCategory:
+  extensions:
+    - SilverStripe\BlogFeaturedPosts\BlogCategoryExtension
+```
+
+We've made a lot of changes, so let's run a `?flush` and see that we still have our featured posts.
+
+## Hosting your module on Github
+Making your module available to others starts with giving it its own public repository. A vast majority of SilverStripe modules are hosted on Github. Let's go there now and create a new repository. We'll initialise it with a README file.
+
+Now, in your module directory, run the following commands:
+```
+$ git init
+$ git add .
+$ git commit -m "Initial commit"
+```
+
+Now that we've committed our changes, we need to connect this local copy to the remote repository. The remote URL to your repository is provided on its main page in Github, with a copy-to-clipboard button beside it for your convenience.
+```
+$ git remote add origin git@github.com:/path/to/your-repo.git
+```
+
+Lastly, because the remote repository has a commit that we don't (the empty README), we'll need to pull down those changes before we can push to remote.
+```
+$ git pull -u origin master
+```
+
+Now, let's push to remote.
+```
+$ git push -u origin master
+```
+
+## Publishing your module on Packagist
+Having our module on Github is good, but our endgame is for people to be able to install this module with Composer. For that, we'll need to publish it on Packagist.
+
+If you don't already have an account on Packagist, simply create one. It takes less than 30 seconds.
+
+Before we can submit our module, we'll need a `composer.json` file. This will inform Composer and Packagist what the requirements are for your module, along with various other metadata.
+
+Let's create a simple composer.json file in the root of the module directory.
+
+*blog-featured-posts/composer.json*
+```js
+{
+"name": "unclecheese/silverstripe-blog-featured-posts",
+"description": "Adds featured posts to the blog module.",
+"keywords": [
+  "silverstripe",
+	"blog"
+],
+"type": "silverstripe-module",
+"require": {
+	"silverstripe/blog": "3.0.x-dev"
+},
+"extra": {
+	"installer-name": "blog-featured-posts"
+},
+"license": "BSD-3-Clause",
+"authors": [
+	{
+		"name": "Your Name Here",
+		"email": "your_email@example.com"
+	}
+]
+}
+```
+Let's walk through this bit by bit:
+*`"name"`:: This is the most important part of the composer.json. It is name of the package a user will use to install the module, e.g. `composer require [package name]`. The naming convention is `vendor-name/package-name`. Typically the package name should start with the word `silverstripe-` to help people understand that this is a module for another product, and also to future-proof you against packages you may create that do similar things in different contexts. For instance, you might have a MailChimp adapter for both SilverStripe and Magento. If one of them was simply named `your-name/mailchimp` you'd have a hard time disambiguating the second one.
+*`"description"`: This is pretty loosely defined. Try to keep it to one brief sentence that tells the user everything he or she needs to know.
+* `"keywords"`: This is just used for search fodder. Don't go to crazy here. The goal isn't to turn up in every search. You're not selling anything!
+* `"type"`: It is critical that you specify the type as `silverstripe-module`. This gives specific instructions to Composer on how to install the package, e.g. not in the `vendor/directory`, which is the default destination for Composer packages.
+* `"require"`: Notice that we only specify the blog as a dependency, because we know that blog already requires the CMS and framework.
+* `"installer-name"`: This tells Composer what the name of the module directory should be. Without it, it will use the name of the repository, which includes the prefix "silverstripe-". We try to avoid that so the modules don't all cluster together in the directory listing.
+* `"license"`: Open source code needs to be licensed for distribution and modification. We've chosen a BSD-3 license for now. We'll talk more about licensing in the next lesson.
+* `"authors"`: It's a good idea to list yourself as the author, so people know who to go to for support. Plus, if it's a great module, it never hurts to earn some credibility.
+
+Save this `composer.json` file, commit it, and push to remote.
+```
+$ git add .
+$ git commit -m "Added composer.json"
+$ git push origin master
+```
+Let's go back to Packagist. Click on the "submit" button, and paste in the URL to your repository. It will acquire all the information it needs from your `composer.json` file. Your package is now published.
+
+Notice that we have a warning stating that the package is not auto-updated. This means that every time we update our module, we'll need to manually tell Packagist to look for the changes. It would be great if this could happen transparently, so let's do that.
+
+Go into your Packagist profile, and click "show API key." Copy it to your clipboard. This is sensitive data, so be sure to keep it a secret. Now go back to your Github repository and click on Settings, then Webhooks & Services. Click Add Service, and find Packagist. Add your API key, username, and save. Then click "Test service."
+
+Back on your Packagist page, you should see that the module is now auto-updated.
+
+## Releasing
+Before anyone can legally use our module, we need to add a license. We've already specified in our `composer.json` file that we're going to use the BSD-3 license. The easiest way to put a license in your project is when the repository is created. Github will ask you what type of license you want before you even make your first commit. Fortunately, doing it retroactively is very simple as well.
+
+Just click on "new file", and type "LICENSE" as the name of the file. Github will ask you if you want to use a template. Select BSD-3, or whatever license you're comfortable with, as long as it's consistent with your `composer.json` file. Make a new commit.
+
+Our module is now public facing, Composer is aware of it, and people can use it in their projects legally, but one thing is missing – we do not yet have a stable release. The only release available on our module right now is `dev-master`, which is effectively the most recent commit to the master branch. We want to leave the `master` branch open to accepting and testing pull requests, and doing new development. It should not be considered stable.
+
+Creating a release is easily done in Github. Just click on the "Releases" tab, and then "Draft new release." Since this is fairly stable code, let's just call it `1.0.0`. We'll point this release to the latest commit on master. Let's now publish the release. Thanks to our auto-update hook, Packagist will soon be aware of it.
+Now that Packagist has our release, let's update the README to include installation instructions.
+
+*blog-featured-posts/README.md*
+
+
+## Featured posts for the SilverStripe blog module
+This module adds the option for blog posts to be marked as "featured" in the CMS.
+
+## Installation
+composer require unclecheese/silverstripe-blog-featured-posts
