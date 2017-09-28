@@ -1,175 +1,59 @@
-* An overview of environments
-* Setting up logging on different environments
-* Dealing with email
+## Overview of dependency management works in SilverStripe
 
-## An overview of environments
+If you refer back to our first lesson on installing SilverStripe in your development environment, you'll recall that we did this using Composer. Composer is a dependency manager for PHP, and it makes our lives a whole lot easier by providing version constraints, allowing for peer dependencies, and never allowing our project to exist in a state where two packages conflict with each other. The primary place you will find packages for Composer is on [packagist.org](http://packagist.org), a directory where package authors submit links to their code repositories for others to install easily. Many packages are set up to auto-update from their repositories, ensuring that the directory is always up to date with the latest releases.
 
-So far we've been working on our project only in the context of a development environment, but it's important to consider that we're eventually going to want to deploy to a remote test environment, and hopefully soon after, a production website. A given project can have many environments, especially large projects that are entertaining multiple, concurrent development efforts. Each environment introduces new state, and managing that state can be really cumbersome if you don't have a solid set up. Therefore, it's important to start considering your environments early on in your development process.
+## How Composer works in your project
 
-We've already talked a bit about the centrepiece of environment management in SilverStripe, the `.env` file. Just as a reminder, this file is intended to reside above the web root to provide environment-specific variables to the project. This allows you to deploy one coherent codebase to each environment without having to write conditional logic to serve each environment. It does introduce the complexity of needing a higher level of write access to your server, however, so you'll want to make sure you have shell access or a highly privileged FTP account that will allow you to edit files above the web root.
+There are two main ingredients to a project managed by Composer, and they both sit at the root of your project: `composer.json` and `composer.lock`. It is very easy to confuse these two files, or treat them similarly, but understanding the difference is critical.
 
-## Setting up logging on different environments
+`composer.json` is the file that declares the packages required for your project to run, and the range of versions that are acceptable. This second piece is really important. Many `composer.json` files do not specify an exact release or commit. They provide boundaries, for instance, "no lower than 2.0, and no higher than 2.1". This allows for opt-in upgrades with a single command.
 
-One of the services you'll want enabled on test and, even more so, production, is good error logging and notification. In our dev environment, we want to suppress this, as we don't mind getting verbose errors, but once the project is on the web, you'll want to suppress showstopping errors as much as possible and simply log them out so you can proactively fix them.
+`composer.lock` is the file that specifies exactly what commits of each package the project is using. When your project is deployed, or when another user installs your project, this file is used to pull down the exact versions of the dependencies that are currently running on the project.
 
-As of version 4.0, SilverStripe uses the [PSR-3 logging](https://github.com/php-fig/fig-standards/blob/master/accepted/PSR-3-logger-interface.md) standard. This means it is easy to swap out the logger with an alternative implementation, and allows your SilverStripe application to play nicely with other frameworks and libraries.
+An easier way to think of the separation is that `composer.json` is used by `composer update` and `composer.lock` is used by `composer install`.
 
-To log errors, just access the logger interface with Injector.
+When you run `composer update`, Composer will check your `composer.json` and see if it can find any newer versions of each package that are allowed within the constraints you've provided. For example:
 
-```php
-use SilverStripe\Core\Injector\Injector;
-use Psr\Log\LoggerInterface;
+* You've specified "no lower than 2.0, and no higher than 2.1" for Package-A.
+* Your `composer.lock` file says you're currently on *2.0.1*
+* Composer finds that a there is a *2.0.2* and a *2.0.3* release of this Package-A.
+* Composer will install *2.0.3*, and update your `composer.lock` file accordingly.
 
-Injector::inst()->get(LoggerInterface::class)->error('Description of error');
+On the other hand, when you run `composer install`, Composer will simply read your `composer.lock` file and download the exact commits specified there. If a new version of Package-A is available, it won't know or care. It is therefore critical to:
+
+* Always run `composer install` and not `composer update` when setting up or deploying a project.
+* Make sure `composer.lock` is in source control. (Ideally `composer.json` as well)
+* Consider running `composer update` a *breaking change*, requiring a new commit (a changed `composer.lock` file), ideally on separate branch, requiring testing before deployment.
+
+## Using Composer to install a module
+
+We'd like to put a blog on our website. Fortunately, there's already a great module authored and maintained by the SilverStripe core team that provides blogging functionality. Let's see if we can find it.
+
+A simple search on Packagist, Github, or even just Google for "silverstripe blog" should turn up everything you need, but the recommended way to find and discover new modules is on [addons.silverstripe.org](http://addons.silverstripe.org). Here, you can see all the latest and popular modules along with instructions on how to install them.
+
+Searching for "blog" on the addons site gives us a result for `silverstripe/blog`. Let's take a look at that. In the instructions, we get a one-line command we can use to install the module. Before we just copy and paste this into the terminal, however, we're going to make a slight change. This command declares the version as "dev-master", which isn't a great idea. We'll basically be locked on to whatever is on the master branch, which is often experimental and untested. A much safer bet here is to choose the latest release. If we don't specify a version, that's what we'll get.
+
+```
+composer require silverstripe/blog
 ```
 
-Also available per the PSR-3 standard are:
+Notice how we don't get the exact version *2.3.0*. The caret (^) before the version number tells composer to allow the latest stable release of version *2.x*, so when *2.4* comes out, a composer update will fetch that.
 
-* `emergency()`
-* `alert()`
-* `critical()`
-* `warning()`
-* `notice()`
-* `info()`
-* `debug()`
-* `log()`
+The blog module has downloaded, and we'll need to run `dev/build` again. We should see a lot of green as all the new tables get built.
 
-For a full list, see the PSR-3 documentation](http://www.php-fig.org/psr/psr-3/).
+We'll want to make sure that this new directory does not get checked into our repository, so it's important to add it to our `.gitignore` file before we make any new commits.
 
-It's a good idea to throw these in your user code where appropriate. Logging can be very useful for debugging. When using the logger in your classes, you need not keep going through `Injector` to get a logger instance. A cleaner approach is to inject the logger as a dependency.
-
-```php
-namespace My\App;
-
-use Psr\Log\LoggerInterface;
-use PageController;
-
-class MyPageController extends PageController
-{
-  private static $dependencies = [
-    'logger' => '%$' . LoggerInterface::class
-  ];
-  
-  protected $shouldFail = true;
-  
-  public $logger;
-  
-  public function doSomething()
-  {
-    if ($this->shouldFail) {
-      $this->logger->log('It failed');
-    }
-  }
-}
+*.gitignore*
+```
+...
+# ignore project modules
+/blog/
+/lumberjack/
+/tagfield/
 ```
 
-What all of these logging methods acutally do depends on the implementation of `LoggerInterface` that you're using. By default, SilverStripe ships with [Monolog](https://github.com/Seldaek/monolog), a logging library that comes with its own PSR-3 logging implementation, `Monolog\Logger`.
+Let's go into the CMS to create our first blog. Notice that the CMS UI has been slightly updated in version 3.2. There are many other important updates happening under the hood, as well. If we click on "Add new" we can create a new blog. We'll just create an example post to populate it.
 
-The `Monolog\Logger` class supports *handlers*, which must implement their own `HandlerInterface` definition. You can add as many handlers as you like. Some commonly used handlers ship with SilverStripe Framework.
+Taking a look at it on the frontend, we can see it's a bit of a mess. That's because the module ships with its own set of templates, which don't necessarily get along with the templates we're already using. As we covered in earlier tutorials, we can simply override these templates by placing templates of the same name in our theme directory. In the `__assets/` directory that comes with this lesson, you'll find two new templates.
 
-Here's an example of adding an email handler. Any error that happens at or above the given logging level will send an email to an administrator. Let's make anything `error()` and above send an email.
-
-*mysite/_config/logging.yml*
-```yml
-SilverStripe\Core\Injector\Injector:
-  Psr\Log\LoggerInterface: 
-    calls:
-      EmailHandler: [ pushHandler, [ %$EmailHandler ] ]
-  EmailHandler:
-      class: Monolog\Handler\NativeMailerHandler
-      constructor:
-        - errors@example.com
-        - Error reported on example.com
-        - admin@example.com
-        - error
-      properties:
-        ContentType: text/html
-        Formatter: %$SilverStripe\Logging\DetailedErrorFormatter
-```
-
-Since email is a pretty aggressive form of error notification, we probably don't want to sent it from anywhere other than the live environment. Let's put this in a conditional block.
-
-*mysite/_config/logging.yml*
-```yml
-    --- 
-    Name: lessons-live-logging
-    Only:
-      environment: live
-    ---
-    SilverStripe\Core\Injector\Injector:
-     Psr\Log\LoggerInterface: 
-      calls:
-        EmailHandler: [ pushHandler, [ %$EmailHandler ] ]
-    #...
-```
-
-
-A better option for low-level errors is writing to a log file. Let's set that up for anything over `notice()` level.
-
-*mysite/_config/logging.yml*
-```yml
-    ---
-    Name: lessons-all-logging
-    ---
-    SilverStripe\Core\Injector\Injector:
-      Psr\Log\LoggerInterface: 
-        calls:
-          FileLogger: [ pushHandler, [ %$FileLogger ] ]
-      FileLogger:
-        class: Monolog\Handler\StreamHandler
-        constructor:
-          - "../errors.log"
-          - "notice"
-```
-
-
-## Dealing with email
-
-While we're on the topic of email, let's take some control over transactional emails in our environments. This can be a really annoying problem for a couple of reasons. For one, if we're testing with real data, we don't want transactional emails to be sent to real users from our development environment. Second, we want to be able to test whether those emails would be sent, and what their contents would be if we were in production.
-
-A simple solution to this problem is to simply force the "to" address to go to you in the dev environment. You can configure this in the config yaml.
-
-*mysite/_config/config.yml*
-```yaml
-Email:
-  send_all_emails_to: 'me@example.com'
-```
-
-Pretty straightforward, but we're forgetting something. We don't want this setting to apply to all environments. We need to ensure that this yaml is only loaded in the dev environment. We're not writing PHP, so we don't have the convenience of if/else blocks, but fortunately, the SilverStripe YAML parser affords us a basic API for conditional logic.
-
-*mysite/_config/email.yml*
-```yaml
-    ---
-    Name: dev-email
-    Only:
-      environment: dev
-    ---
-    Email:
-      send_all_emails_to: 'me@example.com'
-```
-
-Perhaps in the test and production environments, we want to monitor transactional email from a bit of a distance. We could force a BCC to our email address in that case.
-
-*mysite/_config/email.yml*
-```yaml
-    ---
-    Name: dev-email
-    Only:
-      environment: dev
-    ---
-    Email:
-      send_all_emails_to: 'me@example.com'
-    ---
-    Name: live-email
-    Except:
-      environment: dev
-    ---
-    Email:
-      bcc_all_emails_to: 'me@example.com'
-```
-
-This works okay, but it's kind of broad. If we have other developers on the project, they're not going to get any emails, and we also can't accurately test from our dev environment what the "to" address would actually be in production or test.
-
-### MailCatcher
-
-A much more thorough solution is to use a thirdparty tool to capture outgoing emails from your dev environment. There are a few of these tools available, but the one I like, and recommend, is [MailCatcher](https://mailcatcher.me/). Follow the instructions on the home page to install the software, and with just a bit of configuration, you can pipe all email into a local inbox. To browse the inbox, simply visit localhost:1080. Now, you can monitor all outgoing emails, and know exactly who would receive them and what their contents would be in a production environment.
+So far, when adding the templates, we've been placing them in `templates/SilverStripe/Lessons`, which works great for our own code, but because `Blog` and `BlogPost` are from another vendor, and therefore in a different namespace (`SilverStripe\Blog\Model`), we'll need to add them to a directory that matches. Copy those two templates into`templates/SilverStripe/Blog/Model/Layout` in your theme directory, and run `?flush`. The template should look a bit better now.
